@@ -67,6 +67,10 @@ if (used != null) {
 The two times are `Duration`s, so they count milliseconds; a child that used
 less than one reports none.
 
+On Linux, `peakMemory` is never less than the memory the parent held when it
+started the child, because the kernel charges that memory to the child. To
+measure a small program, start it from a small parent.
+
 Its optional third argument is a `process.ChildRunOptions`:
 
 | Field | Type | Description |
