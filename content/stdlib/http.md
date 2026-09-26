@@ -165,7 +165,7 @@ On an ordinary route, `req.read()` returns the whole body once, so a handler wri
 
 Streaming is not the default because reading a body means waiting, and only a named `async` function can wait. Making every route stream would stop you writing short handlers inline, as in the `route` examples.
 
-If a streaming handler answers without reading the whole body, the server reads and throws away up to 256 KB of what is left, so the connection can be reused. Past that it closes the connection instead.
+If a streaming handler answers without reading the whole body, the server reads and throws away up to 256 KB of what is left, so the connection can be reused. Past that it closes the connection instead. Before it closes, it keeps reading and throwing away for up to 500 ms, so the client can read the response before the connection is torn down.
 
 ## `Server.listen()`
 
