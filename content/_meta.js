@@ -1,0 +1,22 @@
+export default {
+  index: 'Introduction',
+  installation: 'Installation',
+  quickstart: 'Quickstart',
+  basics: 'Basics',
+  functions: 'Function values',
+  errors: 'Errors',
+  async: 'Async and futures',
+  arrays: 'Arrays',
+  maps: 'Maps',
+  modules: 'Modules',
+  formatting: 'Formatting',
+  testing: 'Testing',
+  doc: 'Documentation',
+  native: 'Native interop',
+  packages: 'Packages',
+  packaging: 'Packaging',
+  memory: 'Memory',
+  versions: 'Versions',
+  stdlib: 'Standard Library',
+  libraries: 'Libraries'
+}

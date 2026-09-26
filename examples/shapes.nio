@@ -1,0 +1,14 @@
+// A multi-file program: run with `nio run examples/shapes.nio`.
+
+import 'geometry' as geo;
+import 'json';
+
+geo.Point a = geo.makePoint(0, 0);
+geo.Point b = geo.makePoint(3, 4);
+
+print(json.toText(b));         // {"x":3,"y":4}
+print(geo.manhattan(a, b));    // 7
+print(geo.pointsMade);         // 2
+int i = 0;
+i++;
+print(i);

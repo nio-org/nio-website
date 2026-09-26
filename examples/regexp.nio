@@ -1,0 +1,60 @@
+// Matching text against a pattern. regexp.create compiles a pattern once.
+// find answers a byte offset or -1, and match answers a bool.
+import 'regexp';
+import 'string';
+
+// create takes the pattern and, optionally, flags. "i" folds ASCII case.
+RegExp mySearchRegexp = regexp.create("ab+c", "i");
+
+print(regexp.find("xxABBBCyy", mySearchRegexp));       // 2
+print(regexp.match("xxABBBCyy", mySearchRegexp));      // true
+print(regexp.match("xxacyy", mySearchRegexp));         // false
+print(regexp.find("nothing here", mySearchRegexp));    // -1
+
+RegExp digits = regexp.create("[0-9]+");
+print(regexp.find("abc 4321 def", digits));      // 4
+print(regexp.find("order 66 of 99", digits));    // 6 -- the leftmost one
+print(regexp.match("abc", digits));              // false
+
+// A backslash is written twice: the pattern is a Nio string first.
+print(regexp.match("year 2024", regexp.create("\\d{4}")));         // true
+print(regexp.match("the cat sat", regexp.create("\\bcat\\b")));    // true
+print(regexp.match("concatenate", regexp.create("\\bcat\\b")));    // false
+
+// Anchors ask about the whole string rather than any part of it.
+print(regexp.match("xxabcyy", regexp.create("abc")));      // true
+print(regexp.match("xxabcyy", regexp.create("^abc$")));    // false
+
+// find gives a byte offset, which is what string.substring takes.
+String log = "level=warn msg=disk full";
+int at = regexp.find(log, regexp.create("msg=.*"));
+if (at >= 0) {
+    print(string.substring(log, at, string.length(log)));    // msg=disk full
+}
+
+// A RegExp is an ordinary value: passed, returned, kept in an array.
+RegExp[] comments = [regexp.create("^#"), regexp.create("^//")];
+
+bool isComment(String line) {
+    forEach(comments, pattern) {
+        if (regexp.match(line, pattern)) { return true; }
+    }
+    return false;
+}
+
+print(isComment("# a note"));      // true
+print(isComment("// another"));    // true
+print(isComment("code();"));       // false
+
+// create is fallible: a pattern is text, and text from a config file or a
+// command line can be wrong.
+RegExp? bad = regexp.create("a(b") catch e {
+    print(e.message);                             // regexp.create "a(b": unmatched (
+    print(e.code == regexp.ErrorCode.INVALID);    // true
+};
+print(bad == null);    // true
+
+// The engine follows every alternative at once instead of backtracking, so
+// the patterns that hang other engines answer at once.
+RegExp evil = regexp.create("(a+)+b");
+print(regexp.match("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", evil));    // false

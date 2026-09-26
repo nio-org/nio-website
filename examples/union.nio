@@ -1,0 +1,95 @@
+// Union types (§2.11): a value that is exactly one of a fixed set of types.
+// A union compiles to a sealed type with one extending type per member
+// (examples/sealed.nio), which is where the coverage checking comes from.
+import 'string';
+
+// A member is a type followed by a tag. A member whose type is one capitalized
+// name takes its tag from the type, so `String` here is `Text.String`.
+union Text {
+    String,
+    byte[] Bytes }
+
+// A value goes in on its own whenever exactly one member can hold it.
+Text greeting = "hello";
+Text raw = string.toByteArray("world");
+
+// A case clause binds what the member holds: `v` is a String in the first arm
+// and a byte[] in the second.
+String render(Text t) {
+    switch (t) {
+        case Text.String v: return v;
+        case Text.Bytes v: return string.fromByteArray(v);
+    }
+}
+
+print(render(greeting));    // hello
+print(render(raw));         // world
+
+// With no `default`, the clauses must cover every member: a member added to
+// `Text` later makes this switch a compile error.
+
+// `as` answers what the member holds, or null when the value is another member.
+String? s = greeting as Text.String;
+if (s != null) {
+    print("as: " + s);    // as: hello
+}
+print(raw as Text.String == null);    // true — raw is the Bytes member
+
+// ---------------------------------------------------------------------------
+// Two members may share a type, and then the tag is what tells them apart.
+// The compiler cannot guess which is meant, so these are built by name.
+// ---------------------------------------------------------------------------
+
+union Distance {
+    float Meters,
+    float Feet }
+
+// Distance bad = 3.0;      // error: Meters and Feet both accept a float
+
+String show(Distance d) {
+    switch (d) {
+        case Distance.Meters m: return string.from(m) + "m";
+        case Distance.Feet f: return string.from(f) + "ft";
+    }
+}
+
+Distance m = Distance.Meters(1.5);
+Distance f = Distance.Feet(4.9);
+print(show(m));    // 1.5m
+print(show(f));    // 4.9ft
+
+// ---------------------------------------------------------------------------
+// Members can be any type, including function types.
+// ---------------------------------------------------------------------------
+
+type Request { String path; }
+
+union Handler {
+    Function(Request)<String!> Sync,
+    Function(Request)<Future<String>> Async }
+
+String quick(Request r) { return "sync " + r.path; }
+String broken(Request r) { return Error("handler failed"); }
+String async slow(Request r) { return "async " + r.path; }
+
+// No tag needed: the signature each literal writes down picks the member.
+Handler[] handlers = [
+    String (Request r) -> quick(r),
+    String (Request r) -> broken(r),
+    Future<String> (Request r) -> slow(r),
+];
+
+String async run(Handler h, Request req) {
+    switch (h) {
+        case Handler.Sync fn: return fn(req) catch e { return "500 " + e.message; };
+        case Handler.Async fn: return await fn(req);
+    }
+}
+
+Request req = { path: "/hi" };
+forEach(handlers, h) {
+    print(await run(h, req));
+}
+// sync /hi
+// 500 handler failed
+// async /hi

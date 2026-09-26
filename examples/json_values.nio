@@ -1,0 +1,213 @@
+// Every way a program can read and write JSON (§6.3). `as T` reads a known
+// shape into a declared type, checked at compile time. A bare `json.parse`
+// reads an unknown shape into a Json the program navigates at run time.
+
+import 'json';
+import 'string';
+import 'time';
+
+// ---- the document every section below reads ----
+
+String const doc = `{
+    "name": "api",
+    "port": 8080,
+    "tls": { "enabled": false, "cert": "/etc/certs/api.pem", "minVersion": "1.2" },
+    "tags": ["prod", "eu"],
+    "owner": "platform-team",
+    "limits": { "rate": 100, "burst": 20 },
+    "deprecatedFlag": true
+}`;
+
+// ---- 1. dynamic: json.parse with no type ----
+//
+// The parse is fallible: the text comes from outside the program (§2.9).
+
+print("-- dynamic --");
+
+Json? raw = json.parse(doc) catch e {
+    print("cannot parse: " + e.message);
+};
+
+if (raw != null) {
+    print(json.getType(raw) == json.Type.OBJECT);    // true
+
+    // Indexing navigates. The answer is always a Json, never an optional.
+    print(json.asText(raw["name"]) catch "?");               // api
+    print(json.asInt(raw["port"]) catch -1);                 // 8080
+    print(json.asBool(raw["tls"]["enabled"]) catch true);    // false
+    print(json.asInt(raw["limits"]["rate"]) catch -1);       // 100
+
+    // An absent key is MISSING, not an error. MISSING is distinct from NULL,
+    // because JSON tells an absent key from a null one.
+    print(json.getType(raw["nope"]) == json.Type.MISSING);           // true
+    print(json.getType(raw["a"]["b"]["c"]) == json.Type.MISSING);    // true
+
+    // The readers raise when the Json holds a different shape.
+    print(json.asInt(raw["name"]) catch -1);    // json.asInt: this Json is a string
+
+    print(json.length(raw["tags"]));                             // 2
+    print(json.asText(raw["tags"][0]) catch "?");                // prod
+    print(json.getType(raw["tags"][9]) == json.Type.MISSING);    // true
+    forEach(json.keys(raw["tls"]), k) { printInline(k + " "); }
+    print("");    // enabled cert minVersion
+}
+
+// ---- 2. writing into a Json ----
+//
+// Reads alias into the tree and writes deep-copy into it. A write through a
+// subtree changes the document, and no two places in one tree share a node.
+
+print("-- writing --");
+
+Json? w = json.parse('{"a":1,"nested":{"x":10}}') catch e { print(e.message); };
+if (w != null) {
+    w["a"] = 2;
+    w["added"] = "new";
+    w["when"] = time.date.fromText("2026-07-28");    // any value with a JSON form
+    w["flag"] = true;
+    w["ratio"] = 0.5;
+    w["list"] = [1, 2, 3];
+    w["nothing"] = null;    // JSON null: the key is present
+
+    Json nested = w["nested"];    // a view into w, not a copy
+    nested["x"] = 11;
+    nested["y"] = 12;
+
+    json.push(w["list"], 4);
+    w["list"][0] = 9;    // in-range index only
+
+    json.remove(w, "flag");    // setting null keeps the key; this drops it
+
+    print(json.toText(w));
+}
+
+// ---- 3. typed: as T ----
+//
+// The type is the schema: undeclared keys are dropped.
+
+print("-- typed --");
+
+type Engine { float liters; int power 'json:engine_power'; }
+type Truck { String make; Engine engine; String? nickname; }
+
+Truck? t = json.parse('{"make":"volvo","engine":{"liters":12.8,"engine_power":550},"extra":1}') as Truck catch e { print(e.message); };
+if (t != null) {
+    print(t.make);            // volvo
+    print(t.engine.power);    // 550
+    print(t.nickname);        // null
+    print(json.toText(t));    // "extra" is gone: it was never declared
+}
+
+Truck? bad = json.parse('{"make":"volvo"}') as Truck catch e {
+    print(e.message);    // cannot parse JSON: missing field at engine
+};
+print(bad == null);
+
+// ---- 4. reject: strict as T ----
+//
+// strict makes an unknown key a failure, at every depth.
+
+print("-- strict --");
+
+type Limits { int rate; int burst; }
+
+Limits? ok = json.parse('{"rate":100,"burst":20}') strict as Limits catch e { print(e.message); };
+print(ok?.rate);    // 100
+
+Limits? typo = json.parse('{"rat":100,"burst":20}') strict as Limits catch e {
+    print(e.message);    // cannot parse JSON: unknown key "rat"
+};
+print(typo == null);
+
+// Without strict, the unknown key is dropped.
+Limits? loose = json.parse('{"rate":100,"burst":20,"rat":1}') as Limits catch e { print(e.message); };
+print(loose?.rate);    // 100
+
+// ---- 5. preserve: a 'json*' catch-all ----
+//
+// A 'json*' field keeps every key the type does not declare. Preservation is
+// per record: Tls needs its own catch-all for the keys inside tls.
+
+print("-- preserve --");
+
+type Tls { bool enabled; String cert; Json extra 'json*'; }
+type Config { String name; int port; Tls tls; String[] tags; Json extra 'json*'; }
+
+String migrate(String text) {
+    Config c = json.parse(text) as Config;
+
+    c.port = c.port + 1;
+    c.tls.enabled = true;
+
+    // Dynamic writes into a section with no declared type.
+    Json limits = c.extra["limits"];
+    if (json.getType(limits) == json.Type.OBJECT) {
+        Json rate = limits["rate"];
+        if (json.getType(rate) == json.Type.NUMBER) {
+            limits["rate"] = json.asInt(rate) * 2;
+        }
+    }
+
+    c.extra["migratedAt"] = time.date.fromText("2026-07-28");
+    json.remove(c.extra, "deprecatedFlag");
+
+    return json.toText(c);
+}
+
+String? out = migrate(doc) catch e { print("migration failed: " + e.message); };
+print(out);
+// {"name":"api","port":8081,"tls":{"enabled":true,"cert":"/etc/certs/api.pem",
+//  "minVersion":"1.2"},"tags":["prod","eu"],"owner":"platform-team",
+//  "limits":{"rate":200,"burst":20},"migratedAt":"2026-07-28T00:00:00Z"}
+
+// ---- 6. as T on a Json already in hand ----
+//
+// Read the tag dynamically, then read the element into the type it names.
+// `as T` on a Json in hand makes no text round trip.
+
+print("-- as on a tree --");
+
+type Circle { String type; float r; }
+type Square { String type; float side; }
+
+Json[]? shapes = json.parse('[{"type":"circle","r":2},{"type":"square","side":3}]') as Json[]
+    catch e { print(e.message); };
+
+if (shapes != null) {
+    forEach(shapes, it) {
+        String tag = json.asText(it["type"]) catch "";
+        if (tag == "circle") {
+            Circle? x = it as Circle catch e { print(e.message); };
+            print("circle " + string.from(x?.r));
+        }
+        if (tag == "square") {
+            Square? y = it as Square catch e { print(e.message); };
+            print("square " + string.from(y?.side));
+        }
+    }
+}
+
+// ---- 7. Json in other positions ----
+//
+// Json composes with the containers the language already has.
+
+print("-- composition --");
+
+type Log { int id; Json[] events; Map<String, Json> meta; }
+
+Log? log = json.parse('{"id":42,"events":[1,"started",{"pct":50},null,[1,2]],"meta":{"a":1,"b":"two"}}') as Log catch e { print(e.message); };
+
+if (log != null) {
+    print(log.id);    // 42
+    forEach(log.events, e) {
+        printInline(string.from(json.getType(e)) + " ");
+    }
+    print("");    // 3 4 6 1 5
+    // A map lookup answers Json? (§2.8), so it narrows before it is read.
+    Json? a = log.meta["a"];
+    if (a != null) { print(json.getType(a) == json.Type.NUMBER); }    // true
+}
+
+// A large integer survives the round trip exactly; it never passes through a double.
+Json? big = json.parse('{"id":9007199254740993}') catch e { print(e.message); };
+print(json.toText(big));    // {"id":9007199254740993}

@@ -1,0 +1,95 @@
+// Errors. A function that fails returns an Error, and the compiler infers
+// which functions can fail from their bodies. An error nobody catches travels
+// up the call chain and stops the program.
+
+// Raising: lookupName is fallible because its body can return an Error.
+String lookupName(int id) {
+    if (id < 0) { return Error("negative id"); }
+    if (id == 0) { return Error("id zero is reserved"); }
+    return "Jean";
+}
+
+String fixedName() {    // infallible: no Error anywhere in it
+    return "Ada";
+}
+
+// Propagating: lookupName's error passes through greeting on its own, which
+// makes greeting fallible too.
+String greeting(int id) {
+    return "hello " + lookupName(id);
+}
+
+// catch with a default is an expression: its result is a plain String.
+print(greeting(1) catch "hello, whoever you are");     // hello Jean
+print(greeting(-1) catch "hello, whoever you are");    // hello, whoever you are
+
+// A catch block bound to a plain type must leave the scope: name has no
+// other value to hold.
+String describe(int id) {
+    String name = lookupName(id) catch e {
+        print("lookup failed: " + e.message);
+        return "unknown";    // an ordinary return: describe succeeds
+    };
+    return "found " + name;
+}
+
+print(describe(2));    // found Jean
+print(describe(0));    // lookup failed: id zero is reserved
+// unknown
+
+// Bound to an optional, falling out of the block sets it to null instead.
+String? maybe = lookupName(-1) catch e {
+    print("caught: " + e.message);    // caught: negative id
+};
+print(maybe);    // null
+
+String? none = lookupName(0) catch null;
+print(none);    // null
+
+// In statement position nothing is bound, so a block may fall through.
+greeting(-1) catch e {
+    print("ignored: " + e.message);    // ignored: negative id
+};
+
+// Re-raising: "return e" in a catch block gives the error to this
+// function's caller.
+String shout(int id) {
+    String name = lookupName(id) catch e {
+        print("shout is giving up");
+        return e;
+    };
+    return name + "!";
+}
+
+print(shout(2) catch "quiet");    // Jean!
+print(shout(0) catch "quiet");    // shout is giving up
+// quiet
+
+// A function type has no body to infer from, so a fallible one writes "!"
+// on its return type.
+Function(int)<String!> nameGenerator() {
+    return String (int id) -> {
+        if (id == 0) { return Error("bad seed"); }
+        return "Jack";
+    };
+}
+
+Function(int)<String!> gen = nameGenerator();
+print(gen(1) catch "anonymous");    // Jack
+print(gen(0) catch "anonymous");    // anonymous
+
+// Async functions are inferred too, and a stored future carries the marker.
+String async fetchName(int id) {
+    if (id < 0) { return Error("bad id"); }
+    return "Remote";
+}
+
+print(await fetchName(3) catch "offline");    // Remote
+
+Future<String!> pending = fetchName(-1);
+print(await pending catch "offline");    // offline
+
+// Nobody catches this one, so it reaches the top and stops the program:
+//
+//     print(greeting(-1));
+//     runtime error: negative id

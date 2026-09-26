@@ -1,0 +1,101 @@
+// Arrays and the array module. Indexing, .length and forEach are language
+// features; the other operations live in the module. A growable T[] changes
+// length at run time; a fixed-size T[N] never does.
+import 'array';
+import 'json';
+import 'string';
+
+// ---- growing and shrinking ----
+
+int[] xs = [1, 2];
+array.push(xs, 3);
+print(json.toText(xs));             // [1,2,3]
+print(array.pop(xs), xs.length);    // 3 2
+
+// Mutation is in place: there is no copy on assignment.
+int[] alias = xs;
+array.push(alias, 99);
+print(json.toText(xs));    // [1,2,99]
+
+// ---- copying and slicing ----
+
+// slice takes [start, end), end exclusive. copy and slice answer a new
+// growable array: a write to one does not change the other.
+int[] ns = [0, 1, 2, 3, 4];
+print(json.toText(array.slice(ns, 1, 4)));    // [1,2,3]
+print(json.toText(array.slice(ns, 2)));       // [2,3,4] -- to the end
+print(json.toText(array.slice(ns, 2, 2)));    // [] -- empty is fine
+
+int[] part = array.slice(ns, 0, 2);
+part[0] = -1;
+array.push(part, 9);
+print(json.toText(part), json.toText(ns));    // [-1,1,9] [0,1,2,3,4]
+
+// A range outside 0 <= start <= end <= length is a runtime error, not a clamp.
+
+// ---- searching ----
+
+// indexOf answers the first index where == holds, or -1.
+String[] ws = ["alpha", "beta", "gamma", "beta"];
+print(array.indexOf(ws, "bet" + "a"));    // 1
+print(array.indexOf(ws, "delta"));        // -1
+
+// ---- sorting ----
+
+// One argument sorts by the type's own order: the types < is defined on.
+int[] scores = [88, 61, 95, 61, 72];
+array.sort(scores);
+print(json.toText(scores));    // [61,61,72,88,95]
+
+String[] names = ["pear", "apple", "Fig"];
+array.sort(names);
+print(json.toText(names));    // ["Fig","apple","pear"]
+
+// A record has no order of its own: the comparator answers true when x
+// belongs before y.
+type Person { String name; int age; }
+Person[] people = [
+    { name: "cara", age: 31 },
+    { name: "abe", age: 44 },
+    { name: "bo", age: 19 },
+];
+array.sort(people, bool (Person x, Person y) -> x.age < y.age);
+String byAge = "";
+forEach(people, p) { byAge = byAge + p.name + " "; }
+print(string.trim(byAge));    // bo cara abe
+
+// The comparator may capture, so the order can be decided at run time.
+bool ascending = false;
+array.sort(people, bool (Person x, Person y) -> {
+    if (ascending) { return x.name < y.name; }
+    return x.name > y.name;
+});
+print(people[0].name);    // cara
+
+// Sorting is stable: equal elements keep their order. Sort by the minor key,
+// then by the major key, and the first pass survives inside each group.
+type Row { String tag; int group; }
+Row[] rows = [
+    { tag: "d", group: 2 },
+    { tag: "a", group: 1 },
+    { tag: "c", group: 2 },
+    { tag: "b", group: 1 },
+];
+array.sort(rows, bool (Row x, Row y) -> x.tag < y.tag);
+array.sort(rows, bool (Row x, Row y) -> x.group < y.group);
+String order = "";
+forEach(rows, r) { order = order + r.tag + string.from(r.group) + " "; }
+print(string.trim(order));    // a1 b1 c2 d2
+
+// ---- fixed-size arrays ----
+
+// push and pop are refused: a fixed-size array's length is part of its type.
+int[5] fixed = [50, 20, 40, 10, 30];
+array.sort(fixed);
+print(json.toText(fixed));          // [10,20,30,40,50]
+print(array.indexOf(fixed, 40));    // 3
+
+// copy and slice are also how a fixed-size array becomes a growable one.
+int[] grown = array.slice(fixed, 1, 4);
+array.push(grown, 99);
+print(json.toText(grown));    // [20,30,40,99]

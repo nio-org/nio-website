@@ -1,0 +1,57 @@
+// Function values and closures.
+import 'array';
+
+// A function type writes parameters in (...) and the return type in <...>.
+// A function value has no name and puts -> before the body. Captures are by
+// reference.
+Function(int)<int> makeAdder(int a) {
+    return int (int b) -> a + b;
+}
+
+Function()<int> counter() {
+    int n = 0;
+    return int () -> {
+        n = n + 1;
+        return n;
+    };
+}
+
+int apply(Function(int)<int> f, int x) {
+    return f(x);
+}
+
+Function(int)<int> add10 = makeAdder(10);
+print(add10(5));            // 15
+print(makeAdder(40)(2));    // 42
+
+Function()<int> c = counter();
+print(c());    // 1
+print(c());    // 2
+
+print(apply(int (int n) -> n * n, 7));    // 49
+
+// forEach bindings are per iteration: each closure keeps its element.
+Function()<int>[] fns = [];
+forEach([10, 20, 30], e) {
+    array.push(fns, int () -> e);
+}
+print(fns[0]());    // 10
+print(fns[2]());    // 30
+
+// Function values fit anywhere a type fits: fields, arrays, optionals.
+type Handler {
+    String name;
+    Function(int)<int> run;
+}
+
+Handler h = { name: "double", run: int (int x) -> x * 2 };
+print(h.run(8));    // 16
+
+Function()<void>? task;
+if (task == null) {
+    print("no task yet");    // no task yet
+}
+task = void () -> { print("running"); };
+if (task != null) {
+    task();    // running
+}

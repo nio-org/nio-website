@@ -1,0 +1,32 @@
+import 'http';
+import 'json';
+import 'string';
+
+// This API sends mixed types: price is a string or a number, rating an object
+// or a string. A union per field lets the JSON kind pick the member (§6.3).
+union BeerPrice { String, int Amount }
+
+type Score { float average; int reviews; }
+union BeerRating { Score, String Note }
+union BeerId { int Num, String Code }
+
+type BeerData {
+    BeerPrice price;
+    String name;
+    BeerRating rating;
+    String image;
+    BeerId id;
+}
+
+http.ClientResponse beerCall = await http.request(http.Method.GET, 'https://api.sampleapis.com/beers/ale', null);
+BeerData[] beerData = json.parse(await beerCall.text()) as BeerData[];
+
+forEach(beerData, beer) {
+    switch (beer.price) {
+        case BeerPrice.String s: print(beer.name + ": " + s);
+        case BeerPrice.Amount n: print(beer.name + ": " + string.from(n) + " (bare number)");
+    }
+}
+
+// Round-trips: strings stay strings, numbers stay numbers.
+print(json.toText(beerData));

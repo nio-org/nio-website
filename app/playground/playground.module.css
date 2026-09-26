@@ -1,0 +1,460 @@
+/* The same palette as the home page's code windows. */
+.page {
+  --nio-accent: #16a34a;
+  --nio-accent-soft: rgba(34, 197, 94, 0.12);
+  --nio-muted: #56606d;
+  --nio-surface: #f8faf9;
+  --nio-code-bg: #fbfdfc;
+  --nio-border: #e3e8e5;
+  max-width: 96rem;
+  margin: 0 auto;
+  padding: 1.75rem 1rem 3rem;
+}
+
+:global(.dark) .page {
+  --nio-accent: #4ade80;
+  --nio-accent-soft: rgba(74, 222, 128, 0.12);
+  --nio-muted: #9aa5b1;
+  --nio-surface: #121614;
+  --nio-code-bg: #0d110f;
+  --nio-border: #26302b;
+}
+
+.header {
+  max-width: 52rem;
+  margin-bottom: 1.1rem;
+}
+
+.title {
+  margin: 0 0 0.4rem;
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.lead {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--nio-muted);
+}
+
+.lead a {
+  color: var(--nio-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lead code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  background: var(--nio-accent-soft);
+  font-size: 0.85em;
+}
+
+/* Example tabs */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--nio-border);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.tab:hover {
+  border-color: var(--nio-accent);
+}
+
+.tab[aria-pressed='true'] {
+  border-color: var(--nio-accent);
+  background: var(--nio-accent-soft);
+  color: var(--nio-accent);
+  font-weight: 600;
+}
+
+.editedDot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.about {
+  margin: 0.8rem 0 0.7rem;
+  font-size: 0.95rem;
+  color: var(--nio-muted);
+}
+
+/* Code and output, side by side */
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 1rem;
+  /* What is left of the window under the navigation and the header. */
+  height: max(26rem, min(calc(100vh - 19.5rem), 56rem));
+}
+
+.workspace > .window {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.paneTitle {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--nio-muted);
+}
+
+/* Windows */
+
+.window {
+  overflow: hidden;
+  border: 1px solid var(--nio-border);
+  border-radius: 0.8rem;
+  background: var(--nio-code-bg);
+  box-shadow: 0 1.5rem 3rem -1.5rem rgba(0, 0, 0, 0.25);
+}
+
+.bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.6rem 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--nio-border);
+  background: var(--nio-surface);
+}
+
+.dot {
+  flex: none;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--nio-border);
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  margin-left: 0.5rem;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: var(--nio-muted);
+  white-space: nowrap;
+}
+
+.editedLabel {
+  padding: 0 0.35rem;
+  border-radius: 0.25rem;
+  background: var(--nio-accent-soft);
+  color: var(--nio-accent);
+  font-size: 0.7rem;
+}
+
+.notice {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--nio-accent);
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  gap: 0.3rem;
+}
+
+.action {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--nio-border);
+  border-radius: 0.4rem;
+  background: var(--nio-code-bg);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  border-color: var(--nio-accent);
+}
+
+.action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.run {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.3rem;
+  padding: 0.28rem 0.85rem 0.28rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.run:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.run:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.run svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+/* Output */
+
+.output {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13.5px;
+  line-height: 21px;
+}
+
+.output pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+
+.compiler {
+  color: #cf222e;
+}
+
+:global(.dark) .compiler {
+  color: #ff7b72;
+}
+
+.compiler + .program {
+  margin-top: 1rem !important;
+}
+
+.location {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+
+.fault {
+  color: #cf222e;
+}
+
+:global(.dark) .fault {
+  color: #ff7b72;
+}
+
+.hint,
+.problem {
+  margin: 0;
+  font-family: var(--nextra-font-sans, system-ui, sans-serif);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--nio-muted);
+}
+
+.hint kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}
+
+.hint + .hint,
+pre + .hint {
+  margin-top: 0.8rem;
+}
+
+.problem {
+  color: #cf222e;
+}
+
+:global(.dark) .problem {
+  color: #ff7b72;
+}
+
+.stale {
+  opacity: 0.45;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--nio-muted);
+  white-space: nowrap;
+}
+
+.status[data-tone='ok'] {
+  color: var(--nio-accent);
+}
+
+.status[data-tone='warn'] {
+  color: #9a6700;
+}
+
+:global(.dark) .status[data-tone='warn'] {
+  color: #d29922;
+}
+
+.status[data-tone='bad'] {
+  color: #cf222e;
+}
+
+:global(.dark) .status[data-tone='bad'] {
+  color: #ff7b72;
+}
+
+.timing {
+  font-weight: 400;
+  color: var(--nio-muted);
+}
+
+.spinner {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid var(--nio-border);
+  border-top-color: var(--nio-accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.editorArea {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor {
+  position: absolute;
+  inset: 0;
+}
+
+.fallback {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 14px 0 14px 4.4rem;
+  overflow: auto;
+  background: var(--nio-code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.failed {
+  color: var(--nio-muted);
+  font-style: italic;
+}
+
+/* Shortcuts */
+
+.shortcuts {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.shortcuts summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.shortcuts table {
+  margin-top: 0.8rem;
+  border-collapse: collapse;
+}
+
+.shortcuts td {
+  padding: 0.3rem 1.2rem 0.3rem 0;
+  border-bottom: 1px solid var(--nio-border);
+  color: var(--nio-muted);
+}
+
+.shortcuts kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.shortcuts td:first-child {
+  color: inherit;
+}
+
+/* Narrow screens put the output under the code. */
+@media (max-width: 960px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 65vh minmax(14rem, auto);
+    height: auto;
+  }
+}
+
+/* On a phone the buttons take their own row under the file name. */
+@media (max-width: 640px) {
+  .bar {
+    flex-wrap: wrap;
+  }
+
+  .notice {
+    order: 3;
+  }
+
+  .actions {
+    width: 100%;
+    order: 4;
+  }
+
+  .fallback {
+    padding-left: 1rem;
+  }
+}

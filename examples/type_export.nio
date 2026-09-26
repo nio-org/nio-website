@@ -1,0 +1,9 @@
+import 'array';
+
+export int[] const myArray = [2];
+array.push(myArray, 3);
+myArray[0] = 1;
+
+export type MyCar {
+    String make;
+}

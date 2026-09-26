@@ -1,0 +1,87 @@
+import 'json';
+import 'type_export';
+import 'array';
+
+array.push(type_export.myArray, 6);
+print(type_export.myArray[2]);
+type Wheel {
+    int number;
+}
+
+type Car {
+    String make;
+    int? year;
+    Wheel? wheelType;
+    // A method reads its receiver through self. A function-typed field cannot:
+    // a closure captures the variables around it, not the record holding it.
+    int builtYear() {
+        if (self.year != null) {
+            return self.year;
+        }
+        return 0;
+    }
+    // A field, not a method: each car supplies its own function value.
+    Function()<int> returnYear;
+}
+
+type_export.MyCar car2 = {
+    make: "ciao",
+};
+
+int changeCarOwnership(Car myCar) {
+    myCar.make = "Toyota";
+    return 0;
+}
+
+int const buildYear = 1922;
+
+Car myCar = {
+    make: "myCar",
+    year: buildYear,
+    returnYear: int () -> {
+        return buildYear;    // the captured constant, not myCar.year
+    },
+};
+
+Wheel customWheel = {
+    number: 1,
+};
+
+print(myCar.year != null);
+print(myCar.wheelType != null);
+print("QUI");
+print(myCar.returnYear());
+
+myCar.year = 1998;
+// The method follows the field; the captured closure above does not.
+print(myCar.builtYear());
+print(myCar.returnYear());
+print(myCar.wheelType?.number);
+if (myCar.wheelType?.number == 0) {
+    print("HEHEHEH");
+}
+if (myCar.wheelType != null) {
+    print(myCar.wheelType.number);
+}
+myCar.wheelType = customWheel;
+print(myCar.year != null);
+print(myCar.year);
+
+int err = changeCarOwnership(myCar);
+print(err);
+print(myCar.make);
+print(myCar.returnYear());
+// A function-typed field has no JSON form and is left out; a method is never
+// data.
+print(json.toText(myCar));
+
+int[] myList = [1, 2, 3];
+int[] myList2 = myList;
+myList2[1] = 10;
+forEach(myList, i) {
+    print(i);
+}
+print("----");
+forEach(myList2, i) {
+    print(i);
+}

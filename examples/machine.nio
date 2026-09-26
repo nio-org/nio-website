@@ -1,0 +1,26 @@
+// What machine is this? The os module answers. The platform and architecture
+// are fixed when the program compiles; the CPU list is read at run time.
+import 'os';
+import 'path';
+
+print("platform: " + os.getPlatform());
+print("arch:     " + os.getArch());
+
+os.Cpu[] cpus = os.getCpus();
+print("cores:   ", cpus.length);
+
+// Both fields are optional: an Apple Silicon Mac reports no clock speed,
+// and an ARM Linux kernel no model name.
+os.Cpu first = cpus[0];
+String model = "unknown processor";
+if (first.model != null) {
+    model = first.model;
+}
+if (first.speed != null) {
+    print("cpu:      " + model, first.speed, "MHz");
+} else {
+    print("cpu:      " + model + " (speed unreported)");
+}
+
+// The path module writes the host's separator.
+print("path:     " + path.join("home", "notes.txt"));

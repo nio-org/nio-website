@@ -1,0 +1,82 @@
+// Enums: named integer constants as nominal types.
+import 'json';
+
+enum HttpResponses {
+    OK: 200,
+    NOT_FOUND: 404
+}
+
+enum Signal {
+    UP: 1,
+    FLAT: 0,
+    DOWN: -1
+}
+
+HttpResponses r = HttpResponses.OK;
+print(r);    // OK — printing shows the member's name
+
+int code = r;    // an enum value widens to int
+print(code);     // 200
+
+// Comparisons work against the same enum and against ints.
+print(r == HttpResponses.OK);           // true
+print(r != HttpResponses.NOT_FOUND);    // true
+print(r < 400);                         // true
+
+// Enums work anywhere a scalar does.
+type Response {
+    HttpResponses status;
+    String? body;
+}
+
+Response resp = { status: HttpResponses.NOT_FOUND };
+print(resp.status);          // NOT_FOUND
+print(json.toText(resp));    // {"status":404} — JSON gets the value
+
+HttpResponses? maybe = null;
+print(maybe);    // null
+maybe = HttpResponses.OK;
+if (maybe != null) {
+    print(maybe);    // OK — narrowed like any optional
+}
+
+// The zero value is the numeric 0: FLAT names it here, while an enum
+// without a 0-valued member prints its number.
+Signal s;
+print(s);                            // FLAT
+print(Signal.DOWN < Signal.FLAT);    // true
+
+HttpResponses status;
+print(status);    // 0
+
+String describe(HttpResponses r) {
+    if (r == HttpResponses.OK) {
+        return "all good";
+    }
+    return "missing";
+}
+print(describe(HttpResponses.NOT_FOUND));    // missing
+
+// Clauses do not fall into one another, so no "break" separates them. Two
+// stacked labels share one clause.
+String advise(Signal s) {
+    switch (s) {
+        case Signal.UP:
+            return "buy";
+        case Signal.FLAT:
+        case Signal.DOWN:
+            return "wait";
+        default:
+            return "unknown";
+    }
+}
+print(advise(Signal.UP));      // buy
+print(advise(Signal.DOWN));    // wait
+advise(Signal.FLAT);           // wait
+// The labels can be plain integers too, since an enum compares with them.
+switch (r) {
+    case 200:
+        print("two hundred");    // two hundred
+    default:
+        print("other");
+}

@@ -1,0 +1,475 @@
+// The playground's code runner. It takes a program over HTTP, compiles and
+// runs it in a sandbox of its own (run.sh under nsjail), and answers what the
+// compiler and the program wrote.
+//
+//   POST /run     {"code": "..."}  ->  RunResult as JSON
+//   GET  /health  the isolation in use, as JSON
+//
+// Flags: --port, --origin, --max-runs, --per-minute, --run-seconds,
+// --trust-proxy, --isolation and --network. entrypoint.sh fills them from the
+// environment and chooses the isolation.
+//
+// The isolation is one of three, the strongest the host allows:
+//
+//   full        namespaces for processes, network and files, and a cgroup
+//               per run for memory, processes and CPU. Needs --privileged.
+//   namespaces  the same namespaces, with process limits instead of cgroups.
+//   process     no namespaces. A run has a host user and a directory of its
+//               own, process limits, and no internet sockets unless
+//               --network open says the platform blocks outbound traffic.
+import 'array';
+import 'http';
+import 'json';
+import 'os';
+import 'process';
+import 'string';
+import 'time';
+
+String const LIB = "/usr/local/lib/nio-playground";
+String const SLOTS_DIR = "/var/lib/nio-playground";
+int const FIRST_UID = 20000;
+int const MEMORY_MB = 512;
+int const ADDRESS_SPACE_MB = 2048;
+int const PROCESSES = 64;
+int const OUTPUT_LIMIT = 65536;
+int const CODE_LIMIT = 65536;
+int const QUEUE_WAIT_MS = 10000;
+
+type Config {
+    int port;
+    String origin;
+    int maxRuns;
+    int perMinute;
+    int runSeconds;
+    bool trustProxy;
+    String isolation;
+    String network;
+}
+
+type RunRequest {
+    String code;
+}
+
+type RunResult {
+    // "compile" when the compiler refused the program, "run" when it ran.
+    String stage;
+    String compilerOutput;
+    String output;
+    int exitCode;
+    bool timedOut;
+    bool truncated;
+    // The time nio build took, and the time the program took. -1 when the
+    // sandbox did not report it.
+    int compileMs;
+    int runMs;
+    // The whole request, with the sandbox's own setup and teardown.
+    int totalMs;
+    // "loopback" when a program may serve and connect to itself, "none" when
+    // it has no internet sockets at all, "open" when the platform decides.
+    String network;
+}
+
+type Problem {
+    String error;
+}
+
+type Health {
+    bool ok;
+    String isolation;
+    String network;
+    int maxRuns;
+    int active;
+    String selfTest;
+}
+
+Config cfg = {
+    port: 8080,
+    origin: "*",
+    maxRuns: 0,
+    perMinute: 30,
+    runSeconds: 5,
+    trustProxy: false,
+    isolation: "full",
+    network: "none",
+};
+
+// Which run slots are in use. A slot's number picks the host user its run
+// gets, so two runs at once never share one.
+bool[] busy = [];
+
+// What the run at startup found: "passed", or what went wrong.
+String selfTest = "not run";
+
+// Runs per client address in the current minute.
+Map<String, int> hits;
+DateTime windowStart = time.now();
+
+// One line to the log. Standard output is a pipe under Docker, so each line
+// is flushed at once.
+void log(String line) {
+    print(line);
+    process.stdout.flush();
+}
+
+int flagInt(String name, String value) {
+    return string.toInt(value) catch e {
+        log(`nio-playground: ${name} wants a number, got "${value}"`);
+        process.exit(2);
+        return 0;
+    };
+}
+
+void readFlags() {
+    String[] args = process.getArgs();
+    int i = 0;
+    while (i + 1 < args.length) {
+        String name = args[i];
+        String value = args[i + 1];
+        switch (name) {
+            case "--port": cfg.port = flagInt(name, value);
+            case "--origin": cfg.origin = value;
+            case "--max-runs": cfg.maxRuns = flagInt(name, value);
+            case "--per-minute": cfg.perMinute = flagInt(name, value);
+            case "--run-seconds": cfg.runSeconds = flagInt(name, value);
+            case "--trust-proxy": cfg.trustProxy = value == "true" || value == "1";
+            case "--isolation": cfg.isolation = value;
+            case "--network": cfg.network = value;
+            default:
+                log(`nio-playground: unknown flag ${name}`);
+                process.exit(2);
+        }
+        i = i + 2;
+    }
+    if (cfg.maxRuns <= 0) {
+        cfg.maxRuns = os.getCpus().length;
+    }
+    if (cfg.isolation != "full" && cfg.isolation != "namespaces" && cfg.isolation != "process") {
+        log(`nio-playground: --isolation is full, namespaces or process, not "${cfg.isolation}"`);
+        process.exit(2);
+    }
+    if (cfg.network != "none" && cfg.network != "open") {
+        log(`nio-playground: --network is none or open, not "${cfg.network}"`);
+        process.exit(2);
+    }
+    // With namespaces a run has a network of its own that holds only loopback.
+    if (cfg.isolation != "process") {
+        cfg.network = "loopback";
+    }
+    while (busy.length < cfg.maxRuns) {
+        array.push(busy, false);
+    }
+}
+
+int takeSlot() {
+    forEach(busy, b, i) {
+        if (!b) {
+            busy[i] = true;
+            return i;
+        }
+    }
+    return -1;
+}
+
+int inUse() {
+    int n = 0;
+    forEach(busy, b) {
+        if (b) { n = n + 1; }
+    }
+    return n;
+}
+
+void cors(Map<String, String> h) {
+    http.setHeader(h, "Access-Control-Allow-Origin", cfg.origin);
+    http.setHeader(h, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+    http.setHeader(h, "Access-Control-Allow-Headers", "Content-Type");
+    http.setHeader(h, "Access-Control-Max-Age", "86400");
+    if (cfg.origin != "*") {
+        http.setHeader(h, "Vary", "Origin");
+    }
+}
+
+http.Response reply(int status, String body) {
+    http.Response r = http.json(status, body);
+    cors(r.headers);
+    return r;
+}
+
+http.Response problem(int status, String message) {
+    Problem p = { error: message };
+    return reply(status, json.toText(p));
+}
+
+// The client's address without its port. Behind a proxy, the proxy's own
+// address is on every request, so the first X-Forwarded-For entry is used.
+String clientOf(http.Request req) {
+    if (cfg.trustProxy) {
+        String? fwd = http.getHeader(req.headers, "X-Forwarded-For");
+        if (fwd != null) {
+            return string.trim(string.split(fwd, ",")[0]);
+        }
+    }
+    return peerHost(req);
+}
+
+String peerHost(http.Request req) {
+    String peer = req.peer;
+    int colon = -1;
+    forEach(peer, r, i) {
+        if (r == 58) { colon = i; }
+    }
+    if (colon < 0) { return peer; }
+    return string.substring(peer, 0, colon);
+}
+
+// Without a network namespace, a program in the sandbox shares loopback with
+// this server. No real client comes from there, so nothing from there is
+// served.
+bool fromLoopback(http.Request req) {
+    String host = peerHost(req);
+    return string.find(host, "127.") == 0 || host == "::1" || host == "[::1]";
+}
+
+bool allow(String client) {
+    if (time.now() - windowStart > 60000) {
+        hits = {};
+        windowStart = time.now();
+    }
+    int count = 1;
+    int? seen = hits[client];
+    if (seen != null) {
+        count = seen + 1;
+    }
+    hits[client] = count;
+    return count <= cfg.perMinute;
+}
+
+// Text for JSON. A program may write bytes that are not UTF-8, and the output
+// limit can cut a character in half. Each bad byte becomes U+FFFD.
+String text(byte[] b) {
+    String s = string.fromByteArray(b);
+    if (string.isValidUtf8(s)) {
+        return s;
+    }
+    int[] runes = [];
+    forEach(s, r) {
+        array.push(runes, r);
+    }
+    return string.fromRunes(runes);
+}
+
+RunRequest parseRun(byte[] body) {
+    return json.parse(string.fromByteArray(body)) as RunRequest;
+}
+
+int field(String[] fields, int i) {
+    if (i >= fields.length) { return -1; }
+    return string.toInt(fields[i]) catch -1;
+}
+
+// System calls a program has no use for here, most of them ways into the
+// kernel's less exercised parts. Newer calls are written by number, since they
+// are numbered the same on every architecture: 425 to 427 are io_uring, and
+// 435 is clone3, which answers ENOSYS so that the C library falls back to
+// clone, whose namespace flags can be checked. nsjail keeps only the last
+// policy string it is given, so this is one string.
+String policy() {
+    String inet = "";
+    if (cfg.network == "none") {
+        inet = "ERRNO(13) { socket { family == 2 || family == 10 } } ";
+    }
+    return "ERRNO(38) { SYSCALL[435] } " + inet + "ERRNO(1) { "
+        + "clone { (clone_flags & 0x7e020000) != 0 }, "
+        + "unshare, setns, mount, pivot_root, chroot, "
+        + "ptrace, process_vm_readv, process_vm_writev, "
+        + "bpf, perf_event_open, userfaultfd, SYSCALL[425], SYSCALL[426], SYSCALL[427], "
+        + "keyctl, add_key, request_key, "
+        + "init_module, finit_module, delete_module, kexec_load, "
+        + "open_by_handle_at, name_to_handle_at, "
+        + "swapon, swapoff, reboot, syslog, acct, quotactl, "
+        + "settimeofday, clock_settime, adjtimex } DEFAULT ALLOW";
+}
+
+// The nsjail command line for one run in a slot.
+String[] jailArgs(int slot) {
+    String uid = string.from(FIRST_UID + slot);
+    String[] args = [];
+    String work = "/tmp";
+    if (cfg.isolation == "process") {
+        work = `${SLOTS_DIR}/slot-${slot}`;
+        args = ["--config", `${LIB}/sandbox-process.cfg`, "-u", uid, "-g", uid];
+    } else {
+        args = ["--config", `${LIB}/sandbox.cfg`, "-u", `1000:${uid}:1`, "-g", `1000:${uid}:1`];
+    }
+    if (cfg.isolation == "full") {
+        array.push(args, "--mount");
+        array.push(args, "none:/proc:proc:");
+        array.push(args, "--use_cgroupv2");
+        array.push(args, "--cgroup_mem_max");
+        array.push(args, string.from(MEMORY_MB * 1024 * 1024));
+        array.push(args, "--cgroup_mem_swap_max");
+        array.push(args, "0");
+        array.push(args, "--cgroup_pids_max");
+        array.push(args, string.from(PROCESSES));
+        array.push(args, "--cgroup_cpu_ms_per_sec");
+        array.push(args, "1000");
+    } else {
+        // Without cgroups, memory is bounded per process and processes per
+        // host user, which is the slot's own.
+        array.push(args, "--rlimit_as");
+        array.push(args, string.from(ADDRESS_SPACE_MB));
+        array.push(args, "--rlimit_nproc");
+        array.push(args, string.from(PROCESSES));
+    }
+    String[] rest = [
+        "--seccomp_string", policy(),
+        "--env", `RUN_SECONDS=${cfg.runSeconds}`,
+        "--env", `WORK=${work}`,
+        "--", "/bin/sh", `${LIB}/run.sh`,
+    ];
+    forEach(rest, a) {
+        array.push(args, a);
+    }
+    return args;
+}
+
+// Without a PID namespace, what a run left behind is stopped by its user.
+void async clearSlot(int slot) {
+    if (cfg.isolation != "process") {
+        return;
+    }
+    process.ChildRunResult r = await process.child.run("/bin/sh", [
+        `${LIB}/slot.sh`, string.from(slot),
+    ]);
+    if (r.code != 0) {
+        return Error(`cannot prepare slot ${slot}: ${text(r.stderr)}`);
+    }
+}
+
+RunResult async sandbox(String code, int slot) {
+    DateTime started = time.now();
+    await clearSlot(slot);
+    process.ChildRunResult r = await process.child.run("nsjail", jailArgs(slot), {
+        stdin: string.toByteArray(code),
+    });
+    await clearSlot(slot);
+
+    // The last status line on standard error says how the run ended. What
+    // comes before it is the compiler's output.
+    String[] lines = string.split(text(r.stderr), "\n");
+    int at = -1;
+    forEach(lines, line, i) {
+        if (string.find(line, "nio-playground ") == 0) { at = i; }
+    }
+    if (at < 0) {
+        return Error(`the sandbox ended without a result (status ${r.code})`);
+    }
+    String[] fields = string.split(lines[at], " ");
+    String compiler = string.trim(string.join(array.slice(lines, 0, at), "\n"));
+    byte[] out = r.stdout;
+    bool truncated = out.length > OUTPUT_LIMIT;
+    if (truncated) {
+        out = array.slice(out, 0, OUTPUT_LIMIT);
+    }
+    int exitCode = field(fields, 2);
+    RunResult res = {
+        stage: fields[1],
+        compilerOutput: compiler,
+        output: text(out),
+        exitCode: exitCode,
+        timedOut: fields[1] == "run" && exitCode == 124,
+        truncated: truncated,
+        compileMs: field(fields, 3),
+        runMs: field(fields, 4),
+        totalMs: time.milliseconds(time.now() - started),
+        network: cfg.network,
+    };
+    return res;
+}
+
+http.Response async handleRun(http.Request req) {
+    if (fromLoopback(req)) {
+        return problem(403, "Not from here.");
+    }
+    String client = clientOf(req);
+    if (!allow(client)) {
+        return problem(429, "Too many runs from your address. Wait a minute and try again.");
+    }
+    if (req.body.length > CODE_LIMIT) {
+        return problem(413, "The program is too long for the playground.");
+    }
+    RunRequest? parsed = parseRun(req.body) catch null;
+    if (parsed == null) {
+        return problem(400, "The request must be JSON with a \"code\" string.");
+    }
+    // A request that finds every slot taken waits for one, briefly. The server
+    // has one thread, so nothing else can take a slot while takeSlot looks.
+    int waited = 0;
+    int slot = takeSlot();
+    while (slot < 0) {
+        if (waited >= QUEUE_WAIT_MS) {
+            return problem(503, "The playground is busy. Try again in a moment.");
+        }
+        await time.sleep(50);
+        waited = waited + 50;
+        slot = takeSlot();
+    }
+    RunResult res = await sandbox(parsed.code, slot) catch e {
+        busy[slot] = false;
+        log(`run failed: ${e.message}`);
+        return problem(500, "The run could not complete. Try again.");
+    };
+    busy[slot] = false;
+    log(`${client} ${res.stage} ${res.exitCode} ${res.totalMs}ms`);
+    return reply(200, json.toText(res));
+}
+
+http.Response health() {
+    // A host where the sandbox cannot run answers 503, so a platform's
+    // health check keeps traffic away from it.
+    bool ok = selfTest == "passed";
+    Health h = {
+        ok: ok,
+        isolation: cfg.isolation,
+        network: cfg.network,
+        maxRuns: cfg.maxRuns,
+        active: inUse(),
+        selfTest: selfTest,
+    };
+    int status = 200;
+    if (!ok) {
+        status = 503;
+    }
+    return reply(status, json.toText(h));
+}
+
+// Compiles and runs one program in the sandbox before serving, so the log
+// says at once whether this host can run the sandbox as configured.
+void async checkSandbox() {
+    busy[0] = true;
+    RunResult r = await sandbox("print(\"ok\");", 0) catch e {
+        busy[0] = false;
+        selfTest = e.message;
+        return;
+    };
+    busy[0] = false;
+    if (r.stage == "run" && r.exitCode == 0 && r.output == "ok\n") {
+        selfTest = "passed";
+    } else {
+        selfTest = `${r.stage} ended with status ${r.exitCode}: ${r.compilerOutput}${r.output}`;
+    }
+}
+
+readFlags();
+await checkSandbox();
+
+http.Server app = http.server();
+app.route(http.Method.POST, "/run", Future<http.Response> (http.Request r) -> handleRun(r));
+app.route(http.Method.OPTIONS, "/run", http.Response (http.Request r) -> reply(204, ""));
+app.route(http.Method.GET, "/health", http.Response (http.Request r) -> health());
+
+log(`nio-playground: listening on ${cfg.port}, ${cfg.maxRuns} runs at once, `
+    + `isolation ${cfg.isolation}, network ${cfg.network}, self-test ${selfTest}`);
+await app.listen("0.0.0.0", cfg.port, { maxBody: CODE_LIMIT + 4096 }) catch e {
+    log(`nio-playground: cannot listen: ${e.message}`);
+    process.exit(1);
+};

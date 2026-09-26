@@ -1,0 +1,47 @@
+import 'map';
+import 'json';
+
+// A map declared without an initializer starts empty. An overwrite keeps the
+// entry's place.
+Map<String, int> ages;
+ages["alice"] = 31;
+ages["bob"] = 27;
+ages["alice"] = 32;
+print(ages.length);    // 2
+
+// Lookup yields an optional: null for an absent key, never a crash.
+int? age = ages["alice"];
+if (age != null) {
+    print(age);    // 32
+}
+print(ages["carol"]);    // null
+
+// Map literals use quoted keys; record literals use bare field names.
+type Car { String make; int age; }
+Map<String, Car> fleet = {
+    "garage-1": { make: "toyota", age: 4 },
+    "garage-2": { make: "volvo", age: 11 },
+};
+print(fleet["garage-1"]?.make);    // toyota
+
+// A literal takes only quoted keys; a computed key goes through indexing.
+String slot = "garage-3";
+fleet[slot] = { make: "fiat", age: 1 };
+print(fleet.length);    // 3
+
+// map.copy answers a new map: a write to one does not change the other.
+print(map.has(ages, "bob"));    // true
+map.remove(ages, "bob");
+forEach(map.keys(ages), name) {
+    print(name);    // alice
+}
+Map<String, int> dup = map.copy(ages);
+dup["eve"] = 1;
+print(ages.length);    // 1
+print(dup.length);     // 2
+
+// String-keyed maps round-trip through JSON in insertion order.
+print(json.toText(ages));    // {"alice":32}
+String text = '{"user-1":30,"user-2":12}';
+Map<String, int> byUser = json.parse(text) as Map<String, int>;
+print(byUser["user-2"]);    // 12

@@ -1,0 +1,65 @@
+// The test library (build/stdlib/test.nio). A test is a title and a body; an
+// assertion that does not hold raises, which ends the test and reports it.
+// One test below fails on purpose, so this program ends with status 1.
+import 'test';
+import 'string';
+
+int add(int a, int b) { return a + b; }
+String shout(String s) { return string.toUpperCaseAscii(s) + "!"; }
+
+// `start` runs the body at once and reports it. The body may assert because
+// the parameter type is fallible.
+test.start("adds numbers", void () -> {
+    test.expectInt(add(2, 2), 4);
+    test.expectInt(add(-1, 1), 0);
+});    // ok   adds numbers
+
+test.start("shouts", void () -> {
+    test.expectString(shout("nio"), "NIO!");
+});    // ok   shouts
+
+// `assert` is the general form: any condition, plus the message to show.
+test.start("keeps the string short", void () -> {
+    test.assert(string.length(shout("nio")) < 10, "the shout got long");
+});    // ok   keeps the string short
+
+// Computed floats rarely land on an exact value, so compare within a tolerance.
+test.start("adds floats", void () -> {
+    test.expectFloatNear(0.1 + 0.2, 0.3, 0.0001);
+});    // ok   adds floats
+
+// A test stops at its first failed assertion.
+test.start("expects the wrong answer", void () -> {
+    test.expectInt(add(2, 2), 5);
+    print("never reached");
+});    // FAIL expects the wrong answer - expected 5, got 4
+
+// An error the test never expected is reported as a failure too, instead of
+// stopping the program.
+test.start("parses a number", void () -> {
+    test.expectInt(string.toInt("nope"), 42);
+});    // FAIL parses a number - string.toInt "nope": not an integer
+
+// Calling an async function does not run its body: it answers a future. The
+// two tests below interleave at their await points while `run` waits.
+void async fetch(String name) {
+    print("  " + name + " starts");
+    await settle();
+    print("  " + name + " done");
+    test.expectString(shout(name), string.toUpperCaseAscii(name) + "!");
+}
+void async settle() { }
+
+test.startAsync("fetch A", fetch("A"));
+test.startAsync("fetch B", fetch("B"));
+
+// `run` waits for every async test, prints the summary, and exits with
+// status 1 if anything failed.
+test.run();
+//   A starts
+//   B starts
+//   A done
+// ok   fetch A
+//   B done
+// ok   fetch B
+// 6 passed, 2 failed

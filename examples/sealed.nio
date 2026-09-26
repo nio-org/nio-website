@@ -1,0 +1,96 @@
+// Sealed types (§2.4): a type extended only inside its own module, so the
+// compiler knows every extending type. A value of an extending type goes where
+// the sealed type is expected, and a switch over it covers every case (§4.9).
+
+import 'string';
+import 'json';
+
+sealed type Expr {
+    int line;
+}
+
+type IntLit extends Expr { int value; }
+type Ident extends Expr { String name; }
+type Binary extends Expr { String op; Expr left; Expr right; }
+
+// No `default`, so this must handle every type extending Expr, and a new one
+// makes this a compile error. It needs no return: some clause always runs.
+String render(Expr e) {
+    switch (e) {
+        case IntLit n:
+            return string.from(n.value);
+        case Ident n:
+            return n.name;
+        case Binary n:
+            return "(" + render(n.left) + " " + n.op + " " + render(n.right) + ")";
+    }
+}
+
+// A switch with a default is not asked to cover the rest.
+int constants(Expr e) {
+    switch (e) {
+        case IntLit n:
+            return n.value;
+        case Binary n:
+            return constants(n.left) + constants(n.right);
+        default:
+            return 0;
+    }
+}
+
+IntLit two = { line: 1, value: 2 };
+Ident x = { line: 1, name: "x" };
+Binary sum = { line: 1, op: "+", left: two, right: x };
+Binary all = { line: 2, op: "*", left: sum, right: two };
+
+print(render(all));       // ((2 + x) * 2)
+print(constants(all));    // 4
+
+Expr[] nodes = [two, x, sum, all];
+String lines = "";
+forEach(nodes, n, i) {
+    if (i > 0) { lines = lines + " "; }
+    lines = lines + string.from(n.line);    // fields of the sealed type read fine
+}
+print(lines);    // 1 1 1 2
+
+// `as` narrows and answers an optional: the value may be another type (§3.6).
+forEach(nodes, n) {
+    Ident? id = n as Ident;
+    if (id != null) {
+        print("an identifier:", id.name);    // an identifier: x
+    }
+}
+
+// A record carries its own type, so JSON writes what the value is, not what
+// the slot's type said.
+Expr held = two;
+print(json.toText(held));    // {"line":1,"value":2}
+
+// A method is chosen by the type written down, so a receiver typed as the
+// sealed type is refused. Narrowing makes the type certain.
+sealed type Shape {
+    int sides;
+    String describe() { return "a shape"; }
+}
+type Square extends Shape {
+    String override describe() { return "a square"; }
+}
+type Tri extends Shape {
+    String override describe() { return "a triangle"; }
+}
+
+Square sq = { sides: 4 };
+Tri tr = { sides: 3 };
+print(sq.describe());    // a square — the type is certain here
+
+Shape[] shapes = [sq, tr];
+forEach(shapes, s) {
+    // s.describe() would be a compile error: match its type first.
+    switch (s) {
+        case Square q:
+            print(q.describe());    // a square
+        case Tri q:
+            print(q.describe());    // a triangle
+    }
+}

@@ -1,0 +1,150 @@
+// An HTTP server and a client talking to it, in one program. The server binds
+// port 0, so it needs no particular port free. `bind` is separate from `serve`
+// because an async function does not run its body until something awaits it.
+import 'http';
+import 'json';
+import 'string';
+import 'async';
+import 'regexp';
+
+type User {
+    String id;
+    String name;
+}
+
+// Declared before the handlers that name them: a function body may only reach
+// a global declared above it.
+http.Server s = http.server();
+int port = 0;
+
+// A handler takes a Request and answers a Response; the server does the writing.
+http.Response showUser(http.Request req) {
+    String? id = req.params["id"];
+    if (id == null) {
+        return http.text(400, "missing id");
+    }
+    User u = { id: id, name: "ada" };
+    return http.json(200, json.toText(u));
+}
+
+// A handler that waits answers a future instead. It answers a status for its
+// own failures, because the union's Async member holds an infallible future.
+http.Response async slowHello(http.Request req) {
+    http.ClientResponse r = await http.request(
+        http.Method.GET, "http://127.0.0.1:" + string.from(port) + "/", null)
+        catch e { return http.text(502, "could not reach myself"); };
+    String body = await r.text() catch e { return http.text(502, "no body"); };
+    return http.text(200, "the root said: " + body);
+}
+
+// A body is a stream in every direction. A producer answers the next piece and
+// an empty array to end the body; the server frames the pieces as chunks, so a
+// response that never ends is possible -- which is what server-sent events are.
+type Ticks {
+    int left;
+    byte[] async next() {
+        if (self.left == 0) {
+            return [];
+        }
+        self.left = self.left - 1;
+        return string.toByteArray("tick " + string.from(self.left) + "\n");
+    }
+}
+
+// The other direction: a route that reads its request body in pieces rather
+// than being handed it whole. It is registered with routeStream, and only a
+// named async function can pull, since pulling awaits.
+http.Response async count(http.Request req) {
+    int n = 0;
+    while (true) {
+        byte[] piece = await req.read() catch e { return http.text(400, e.message); };
+        if (piece.length == 0) {
+            break;
+        }
+        n = n + piece.length;
+    }
+    return http.text(200, "counted " + string.from(n));
+}
+
+// serve is fallible and async.run refuses a fallible future, so the accept
+// loop goes through a wrapper that catches.
+void async background(http.Server srv) {
+    await srv.serve() catch e { print("serve stopped: " + e.message); };
+}
+
+void async main() {
+    // route takes two unions: a path pattern or a RegExp, and a plain or async
+    // handler. Rule 7 picks each member from what is written, so no call names
+    // a tag.
+    s.route(http.Method.GET, "/", http.Response (http.Request r) -> http.text(200, "hello"));
+    s.route(http.Method.GET, "/users/:id", http.Response (http.Request r) -> showUser(r));
+    s.route(http.Method.GET, "/echo", Future<http.Response> (http.Request r) -> slowHello(r));
+
+    // A RegExp matches the whole path. Segments stay the default because a
+    // regex per route per request costs more.
+    s.route(http.Method.GET, regexp.create("^/item/[0-9]+$"),
+        http.Response (http.Request r) -> http.text(200, "item at " + r.path));
+
+    s.route(http.Method.GET, "/events", http.Response (http.Request r) -> {
+        Ticks t = { left: 3 };
+        http.Response out = http.stream(200, Future<byte[]> () -> t.next());
+        http.setHeader(out.headers, "content-type", "text/event-stream");
+        return out;
+    });
+    s.routeStream(http.Method.POST, "/upload",
+        Future<http.Response> (http.Request r) -> count(r));
+
+    // First match wins, so the catch-all is registered last.
+    s.route(http.Method.GET, "*", http.Response (http.Request r) -> http.text(404, "no route for " + r.path));
+
+    port = s.bind("127.0.0.1", 0, null);
+    async.run(background(s), void () -> { });
+
+    String base = "http://127.0.0.1:" + string.from(port);
+
+    http.ClientResponse a = await http.request(http.Method.GET, base + "/", null);
+    print(string.from(a.status) + " " + await a.text());    // 200 hello
+
+    http.ClientResponse b = await http.request(http.Method.GET, base + "/users/42", null);
+    print(string.from(b.status) + " " + await b.text());
+    // 200 {"id":"42","name":"ada"}
+
+    http.ClientResponse c = await http.request(http.Method.GET, base + "/echo", null);
+    print(string.from(c.status) + " " + await c.text());
+    // 200 the root said: hello
+
+    http.ClientResponse d = await http.request(http.Method.GET, base + "/item/7", null);
+    print(string.from(d.status) + " " + await d.text());    // 200 item at /item/7
+
+    http.ClientResponse f = await http.request(http.Method.GET, base + "/nowhere", null);
+    print(string.from(f.status) + " " + await f.text());    // 404 no route for /nowhere
+
+    // The streamed response arrives one piece per chunk, so an event written on
+    // its own is read on its own.
+    http.ClientResponse g = await http.request(http.Method.GET, base + "/events", null);
+    int pieces = 0;
+    while (true) {
+        byte[] piece = await g.read();
+        if (piece.length == 0) {
+            break;
+        }
+        pieces++;
+    }
+    print("events in " + string.from(pieces) + " pieces");    // events in 3 pieces
+
+    http.ClientOptions up = { body: "0123456789" };
+    http.ClientResponse h = await http.request(http.Method.POST, base + "/upload", up);
+    print(await h.text());    // counted 10
+
+    // A scheme nobody speaks is refused. https works through `tls.connect`,
+    // which verifies the peer by default, but it reaches the real network.
+    http.ClientResponse? e = await http.request(http.Method.GET, "ftp://example.com", null)
+        catch null;
+    print("ftp supported: " + string.from(e != null));    // ftp supported: false
+
+    s.close();
+}
+
+await main() catch err {
+    print("failed: " + err.message);
+};

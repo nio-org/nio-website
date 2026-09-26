@@ -1,0 +1,21 @@
+export default {
+  array: 'Array',
+  async: 'Async',
+  crypto: 'Crypto',
+  fs: 'FS',
+  http: 'HTTP',
+  json: 'JSON',
+  map: 'Map',
+  math: 'Math',
+  net: 'Net',
+  os: 'OS',
+  path: 'Path',
+  process: 'Process',
+  random: 'Random',
+  regexp: 'RegExp',
+  string: 'String',
+  test: 'Test',
+  time: 'Time',
+  tls: 'TLS',
+  x509: 'X509'
+}

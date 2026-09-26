@@ -1,0 +1,76 @@
+// Running other programs. process.child.run starts a child and answers a
+// future: it does not wait, so several children can run at once.
+//
+// The output below is a POSIX host's, and so are the programs it starts: on
+// Windows they come from Git Bash, which writes the root directory as "/c".
+import 'process';
+import 'array';
+import 'string';
+
+// A catch block bound to an optional leaves null when it falls through (§3.7).
+process.ChildRunResult? r = await process.child.run("echo", ["hello from a child"]) catch e {
+    print("could not run echo: " + e.message);
+};
+if (r != null) {
+    print(string.trim(string.fromByteArray(r.stdout)));    // hello from a child
+    print(r.code);                                         // 0
+}
+
+// A nonzero exit is a result, not a failure: the program ran.
+process.ChildRunResult? bad = await process.child.run("sh", ["-c", "echo oops >&2; exit 3"]) catch null;
+if (bad != null) {
+    print(string.trim(string.fromByteArray(bad.stderr)));    // oops
+    print(bad.code);                                         // 3
+}
+
+// Start them all, then collect: the batch takes as long as the longest child.
+// An await outside an async function drives the scheduler the same way.
+String[] waits = ["0.3", "0.2", "0.1"];
+Future<process.ChildRunResult!>[] running = [];
+forEach(waits, w) {
+    array.push(running, process.child.run("sh", ["-c", "sleep " + w + "; echo slept " + w]));
+}
+print("all started");    // all started
+
+forEach(running, f) {
+    process.ChildRunResult? done = await f catch e {
+        print("failed: " + e.message);
+    };
+    if (done != null) {
+        print(string.trim(string.fromByteArray(done.stdout)));
+    }
+}
+// slept 0.3
+// slept 0.2
+// slept 0.1
+
+// The options argument sets the child's input, directory and environment.
+// Every field is optional, so { } and no third argument are the same call.
+process.ChildRunResult? fed = await process.child.run("cat", [],
+    { stdin: string.toByteArray("written to the child\n") }) catch null;
+if (fed != null) {
+    print(string.trim(string.fromByteArray(fed.stdout)));    // written to the child
+}
+
+// env adds to what the child inherits; clearEnv makes the map the whole of it.
+// The child is found through this program's PATH either way.
+process.ChildRunResult? env = await process.child.run("sh", ["-c", "echo $GREETING; pwd"],
+    { env: { "GREETING": "hi" }, cwd: "/" }) catch null;
+if (env != null) {
+    print(string.trim(string.fromByteArray(env.stdout)));    // hi
+}    // /
+
+// inherit gives the child this program's own three streams. Nothing is
+// captured, so the result's stdout and stderr are empty.
+process.ChildRunResult? shared = await process.child.run("echo",
+    ["straight to this program's output"], { inherit: true }) catch null;
+if (shared != null) {    // straight to this program's output
+    print(shared.stdout.length, shared.code);    // 0 0
+}
+
+// The one failure is that the program could not start, and it rides on the
+// future: the catch goes at the await, not at the call.
+await process.child.run("definitely-not-installed", []) catch e {
+    print(e.message);
+    // process.child.run "definitely-not-installed": No such file or directory
+};

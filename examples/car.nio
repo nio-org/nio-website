@@ -1,0 +1,80 @@
+// Records with nested and optional fields, forEach, JSON text and dates.
+
+import 'json';
+import 'time';
+
+type CarWeight {
+    int empty;
+    int? full;
+}
+
+type Car {
+    String make;
+    int age;
+    String? owner;
+    {
+        DateTime date;
+        int amount;
+        String? piece;
+    }[]? repairs;
+    CarWeight weight;
+}
+
+int[] myArray = [2, 5, 4];    // size is optional
+
+int sum;
+
+int sumElements(int a, int b) {
+    return a + b;
+}
+
+// forEach binds the array element, then the loop index.
+forEach(myArray, arrayElement, i) {
+    print(i);
+    print(arrayElement);
+    sum = sumElements(sum, arrayElement);
+}
+
+print(sum);
+
+Car myCar = {
+    make: "toyota",
+    age: 4,
+    weight: { empty: 1200, full: 1600 },
+};
+
+Car[] myCars = [
+    {
+        make: "toyota",
+        age: 4,
+        weight: { empty: 1200, full: 1600 },
+    },
+    {
+        make: "honda",
+        age: 6,
+        weight: { empty: 1100 },
+    },
+];
+
+// The index binding is optional.
+forEach(myCars, aCar) {
+    print(aCar.make);
+}
+
+int test(Car[] cars) {
+    print(cars[0].make);
+    return 0;
+}
+
+String myCarJson = json.toText(myCar);
+print(myCarJson);
+
+myCar.owner = "alice";
+print(json.toText(myCar));
+
+DateTime d = time.date.fromText("2026-07-25");
+print(time.date.year(d));
+print(time.date.toText(time.date.addDays(d, 30)));
+
+myCar.repairs = [{ date: d, amount: 250, piece: "brakes" }];
+print(json.toText(myCar));

@@ -1,0 +1,123 @@
+// Sockets (§6.15): a server and a client in one program, over loopback.
+// The listener binds port 0: the operating system picks a free port, and
+// net.address reports it.
+import 'net';
+import 'async';
+import 'string';
+import 'time';
+
+// ---- a server ----
+
+// Serves one connection. Each await suspends this task only: there is one
+// thread, and no connection blocks another.
+void async handle(Socket c) {
+    // An empty read is not a failure: it means the peer closed its end.
+    byte[] request = await net.read(c, 4096, { timeout: 30000 }) catch e {
+        print("read failed: " + e.message);
+        net.close(c);
+        return;
+    };
+    String text = string.trim(string.fromByteArray(request));
+    print("server heard: " + text);
+
+    await net.write(c, string.toByteArray("you said " + text)) catch e {
+        print("write failed: " + e.message);
+    };
+    net.close(c);
+}
+
+// Closing the listener fails the waiting accept with NOT_CONNECTED and ends the loop.
+void async serve(Listener l) {
+    while (true) {
+        Socket c = await net.accept(l) catch e {
+            return;
+        };
+        // Not awaited: the loop accepts the next connection at once.
+        handle(c);
+    }
+}
+
+// ---- a client ----
+
+void async ask(String addr, String message) {
+    Socket s = await net.tcp.connect(addr, { timeout: 5000 }) catch e {
+        print("connect failed: " + e.message);
+        return;
+    };
+    await net.write(s, string.toByteArray(message)) catch e {
+        print("send failed: " + e.message);
+        net.close(s);
+        return;
+    };
+    byte[] reply = await net.read(s, 4096, { timeout: 5000 }) catch e {
+        print("no reply: " + e.message);
+        net.close(s);
+        return;
+    };
+    print("client heard: " + string.fromByteArray(reply));
+    net.close(s);
+}
+
+// ---- and the two of them ----
+
+void async main() {
+    Listener l = net.tcp.listen("127.0.0.1:0") catch e {
+        print("cannot listen: " + e.message);
+        return;
+    };
+    String addr = net.address(l) catch e {
+        print("cannot read the address: " + e.message);
+        return;
+    };
+    print("listening on " + addr);    // listening on 127.0.0.1:<some port>
+
+    Future<void> server = serve(l);
+    await ask(addr, "hello");
+    await ask(addr, "goodbye");
+
+    net.close(l);
+    await server;
+
+    // A datagram socket hears from anyone, so receive reports the sender.
+    Socket u = net.udp.bind("127.0.0.1:0") catch e {
+        print("cannot bind: " + e.message);
+        return;
+    };
+    String uAddr = net.address(u) catch e { return; };
+    Future<net.Datagram!> incoming = net.receive(u, 2048, { timeout: 5000 });
+    await net.send(u, uAddr, string.toByteArray("to myself")) catch e {
+        print("send failed: " + e.message);
+        return;
+    };
+    net.Datagram d = await incoming catch e {
+        print("receive failed: " + e.message);
+        return;
+    };
+    print("datagram: " + string.fromByteArray(d.data));    // datagram: to myself
+    net.close(u);
+
+    // async.race waits on anything, not only sockets. For a plain deadline
+    // the timeout option is simpler, and it cancels.
+    Socket idle = net.udp.bind("127.0.0.1:0") catch e { return; };
+    Future<net.Datagram!> never = net.receive(idle, 16, { timeout: 5000 });
+    Future<void> tick = time.sleep(50);
+    if (await async.race(never, tick) == 1) {
+        print("the timer won");    // the timer won
+    }
+    // The loser still owes its error to someone (§2.9); collect it.
+    net.close(idle);
+    await never catch e { };
+}
+
+async.run(main(), void () -> {
+    print("finished");
+});
+
+// listening on 127.0.0.1:<some port>
+// server heard: hello
+// client heard: you said hello
+// server heard: goodbye
+// client heard: you said goodbye
+// datagram: to myself
+// the timer won
+// finished

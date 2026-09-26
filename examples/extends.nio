@@ -1,0 +1,53 @@
+// Extending types: `extends` copies a type's members into another, which
+// adds its own and replaces what it wants with `override`.
+
+import 'json';
+
+type Vehicle {
+    String make;
+    String? owner;
+
+    int wheels() { return 4; }
+
+    // Recompiled for every extending type, so self.wheels() finds that
+    // type's override.
+    void describe() {
+        print(self.make, "on", self.wheels(), "wheels");
+    }
+}
+
+type Truck extends Vehicle {
+    int load;
+
+    int override wheels() { return 6; }
+
+    int carry(int extra) {
+        return self.load + extra;
+    }
+}
+
+// Extending chains: a Van has Vehicle's members through Truck.
+type Van extends Truck {
+    bool electric;
+
+    void override describe() {
+        print("van:", self.make, self.wheels(), self.electric);
+    }
+}
+
+Vehicle v = { make: "toyota" };
+Truck t = { make: "volvo", owner: "eli", load: 900 };
+Van van = { make: "ford", load: 300, electric: true };
+
+v.describe();      // toyota on 4 wheels
+t.describe();      // volvo on 6 wheels
+van.describe();    // van: ford 6 true
+
+print(t.owner, t.carry(100));    // eli 1000
+
+// The base's fields come first, then the extending type's own.
+print(json.toText(t));    // {"make":"volvo","owner":"eli","load":900}
+
+// Each type is a type of its own: no Truck is a Vehicle. Only `sealed` relates
+// two record types (examples/sealed.nio).
+print(getType(v), getType(t), getType(van));    // Vehicle Truck Van

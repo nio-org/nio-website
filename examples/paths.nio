@@ -1,0 +1,36 @@
+// Building file-system paths. join and localize read only the text they are
+// given; getCwd asks the operating system. The output below is a POSIX host's;
+// Windows writes a backslash for every separator.
+import 'path';
+import 'string';
+
+// join writes the host's separator and cleans the result: doubled separators
+// collapse, "." goes away, and ".." removes the element before it.
+print(path.join("a", "b", "c"));                    // a/b/c
+print(path.join("a//b///c/"));                      // a/b/c
+print(path.join("src", "./lib", "helpers.nio"));    // src/lib/helpers.nio
+print(path.join("/usr/local", "../bin", "nio"));    // /usr/bin/nio
+
+print(path.join("build/out", "../", "log.txt"));    // build/log.txt
+
+// Empty elements contribute nothing, and an empty result is ".".
+print(path.join("a", "", "b"));    // a/b
+print(path.join("x", ".."));       // .
+
+// A ".." with nothing to remove survives in a relative path and is dropped in
+// an absolute one: the root is its own parent.
+print(path.join("a", "..", ".."));     // ..
+print(path.join("/a", "..", ".."));    // /
+
+// localize only rewrites separators and cleans nothing.
+print(path.localize("./thisdir/file"));             // ./thisdir/file
+print(path.localize("a\\b/c"));                     // a/b/c
+print(path.localize("assets//img/../logo.png"));    // assets//img/../logo.png
+
+// getCwd is absolute, and joins like any other element.
+String cwd = path.getCwd();
+String config = path.join(cwd, "config", "app.json");
+print(string.contains(config, "/config/app.json"));    // true
+
+// A path is text: nothing here checks that any of these exist.
+print(path.join(cwd, "..", "no", "such", "place") != "");    // true

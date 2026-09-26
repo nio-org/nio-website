@@ -1,0 +1,797 @@
+/* The same palette as the playground and the home page's code windows. */
+.panel,
+.trigger {
+  --ai-accent: #16a34a;
+  --ai-accent-strong: #15803d;
+  --ai-accent-soft: rgba(34, 197, 94, 0.1);
+  --ai-accent-line: rgba(34, 197, 94, 0.28);
+  --ai-glow: rgba(34, 197, 94, 0.35);
+  --ai-text: #111814;
+  --ai-muted: #5b6660;
+  --ai-bg: #ffffff;
+  --ai-surface: #f6f9f7;
+  --ai-code-bg: #fbfdfc;
+  --ai-border: #e3e8e5;
+  --ai-shadow: 0 24px 60px -18px rgba(16, 40, 26, 0.28), 0 2px 8px rgba(16, 40, 26, 0.06);
+}
+
+:global(.dark) .panel,
+:global(.dark) .trigger {
+  --ai-accent: #4ade80;
+  --ai-accent-strong: #86efac;
+  --ai-accent-soft: rgba(74, 222, 128, 0.1);
+  --ai-accent-line: rgba(74, 222, 128, 0.25);
+  --ai-glow: rgba(74, 222, 128, 0.3);
+  --ai-text: #e7ece9;
+  --ai-muted: #9aa5b1;
+  --ai-bg: #0f1311;
+  --ai-surface: #151a17;
+  --ai-code-bg: #0b0f0d;
+  --ai-border: #242d28;
+  --ai-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+/* Trigger */
+
+.trigger {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.8rem 0.6rem 0.9rem;
+  border: 1px solid var(--ai-accent-line);
+  border-radius: 999px;
+  background: var(--ai-bg);
+  color: var(--ai-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: var(--ai-shadow);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+  animation: rise 0.35s ease both;
+}
+
+.trigger svg {
+  color: var(--ai-accent);
+}
+
+.trigger:hover {
+  transform: translateY(-2px);
+  border-color: var(--ai-accent);
+  box-shadow:
+    var(--ai-shadow),
+    0 0 0 4px var(--ai-accent-soft);
+}
+
+.kbd {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--ai-border);
+  border-radius: 0.35rem;
+  background: var(--ai-surface);
+  color: var(--ai-muted);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* Panel */
+
+.panel {
+  position: fixed;
+  top: 5rem;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(30rem, calc(100vw - 2.5rem));
+  overflow: hidden;
+  border: 1px solid var(--ai-border);
+  border-radius: 1rem;
+  background: var(--ai-bg);
+  color: var(--ai-text);
+  box-shadow: var(--ai-shadow);
+  animation: panelIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition: border-color 0.6s ease;
+}
+
+.panel[data-busy] {
+  border-color: var(--ai-accent-line);
+}
+
+@media (max-width: 640px) {
+  .panel {
+    inset: 0;
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+  .trigger {
+    right: 1rem;
+    bottom: 1rem;
+  }
+  .kbd {
+    display: none;
+  }
+}
+
+/* A thin line along the top edge that sweeps while an answer is on its way. */
+.progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent 0%, var(--ai-accent) 50%, transparent 100%);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  transition: opacity 0.4s ease;
+}
+
+.panel[data-busy] .progress {
+  opacity: 1;
+  animation: sweep 1.6s ease-in-out infinite;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 0.75rem 0.85rem 1rem;
+  border-bottom: 1px solid var(--ai-border);
+}
+
+.headerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.headerTitle {
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.headerSub {
+  color: var(--ai-muted);
+  font-size: 0.75rem;
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--ai-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.iconButton:hover {
+  background: var(--ai-surface);
+  color: var(--ai-text);
+}
+
+/* The logo's two arcs turn in opposite directions while the model works. */
+.logoBusy [data-part='outer'],
+.orb [data-part='outer'] {
+  transform-origin: 32px 32px;
+  animation: spin 3.2s linear infinite reverse;
+}
+
+.logoBusy [data-part='inner'],
+.orb [data-part='inner'] {
+  transform-origin: 32px 32px;
+  animation: spin 1.8s linear infinite;
+}
+
+/* Messages */
+
+.log {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.1rem 1rem 0.5rem;
+  scrollbar-width: thin;
+}
+
+.user {
+  width: fit-content;
+  max-width: 85%;
+  margin: 0 0 1.1rem auto;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--ai-accent-line);
+  border-radius: 0.9rem 0.9rem 0.25rem 0.9rem;
+  background: var(--ai-accent-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: rise 0.25s ease both;
+}
+
+.assistant {
+  margin-bottom: 1.4rem;
+  animation: rise 0.25s ease both;
+}
+
+.actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.action {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--ai-border);
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--ai-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.action:hover {
+  border-color: var(--ai-accent-line);
+  background: var(--ai-accent-soft);
+  color: var(--ai-text);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 0.6rem;
+  background: rgba(220, 38, 38, 0.06);
+  font-size: 0.85rem;
+}
+
+/* Thinking */
+
+.thinking {
+  margin-bottom: 0.6rem;
+}
+
+.thinkingHead {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  padding: 0.3rem 0.55rem 0.3rem 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ai-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.thinkingHead:disabled {
+  cursor: default;
+}
+
+.thinkingHead:not(:disabled):hover {
+  background: var(--ai-surface);
+}
+
+.thinking[data-active] .thinkingHead {
+  border-color: var(--ai-accent-line);
+  background: var(--ai-accent-soft);
+}
+
+.orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+}
+
+.thinking[data-active] .orb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--ai-glow) 0%, transparent 70%);
+  animation: breathe 2s ease-in-out infinite;
+}
+
+.thinking:not([data-active]) .orb [data-part] {
+  animation: none;
+}
+
+.orbLogo {
+  position: relative;
+}
+
+.thinkingLabel {
+  font-weight: 500;
+}
+
+/* Text lit by a band of green that runs across it. */
+.shimmer {
+  font-weight: 600;
+  background: linear-gradient(
+    90deg,
+    var(--ai-muted) 0%,
+    var(--ai-muted) 35%,
+    var(--ai-accent) 50%,
+    var(--ai-muted) 65%,
+    var(--ai-muted) 100%
+  );
+  background-size: 250% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: shimmer 2.2s linear infinite;
+}
+
+.thinkingTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ai-muted);
+  opacity: 0.8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: fade 0.4s ease both;
+}
+
+.thinkingTitle::before {
+  content: '·';
+  margin-right: 0.5rem;
+}
+
+.chevron {
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.chevron[data-open] {
+  transform: rotate(90deg);
+}
+
+.thinkingBody {
+  margin: 0.4rem 0 0 0.95rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 2px solid var(--ai-accent-line);
+  color: var(--ai-muted);
+  font-size: 0.82rem;
+  animation: fade 0.25s ease both;
+}
+
+.thinkingBody .markdown {
+  font-size: 0.82rem;
+}
+
+/* Answer text */
+
+.markdown {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown blockquote {
+  margin: 0.6rem 0;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 1.3rem;
+}
+
+.markdown ul {
+  list-style: disc;
+}
+
+.markdown ol {
+  list-style: decimal;
+}
+
+.markdown li {
+  margin: 0.2rem 0;
+}
+
+.markdown li::marker {
+  color: var(--ai-accent);
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 1.1rem 0 0.4rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.markdown h1 {
+  font-size: 1.1rem;
+}
+.markdown h2 {
+  font-size: 1.02rem;
+}
+.markdown h3,
+.markdown h4 {
+  font-size: 0.95rem;
+}
+
+.markdown a {
+  color: var(--ai-accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--ai-accent-line);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.markdown a:hover {
+  text-decoration-color: currentColor;
+}
+
+.markdown strong {
+  font-weight: 650;
+}
+
+.markdown :not(pre) > code {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--ai-border);
+  border-radius: 0.3rem;
+  background: var(--ai-surface);
+  font-size: 0.84em;
+}
+
+.markdown blockquote {
+  padding-left: 0.8rem;
+  border-left: 3px solid var(--ai-accent-line);
+  color: var(--ai-muted);
+}
+
+.markdown hr {
+  margin: 1rem 0;
+  border: 0;
+  border-top: 1px solid var(--ai-border);
+}
+
+.tableWrap {
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--ai-border);
+  border-radius: 0.5rem;
+}
+
+.tableWrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.tableWrap th,
+.tableWrap td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--ai-border);
+  text-align: left;
+}
+
+.tableWrap th {
+  background: var(--ai-surface);
+  font-weight: 600;
+}
+
+.tableWrap tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Code blocks */
+
+.code {
+  margin: 0.75rem 0;
+  overflow: hidden;
+  border: 1px solid var(--ai-border);
+  border-radius: 0.6rem;
+  background: var(--ai-code-bg);
+}
+
+.codeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.4rem 0.3rem 0.75rem;
+  border-bottom: 1px solid var(--ai-border);
+  background: var(--ai-surface);
+  color: var(--ai-muted);
+  font-family: var(--x-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+}
+
+.codeCopy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--ai-muted);
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.codeCopy:hover {
+  background: var(--ai-accent-soft);
+  color: var(--ai-text);
+}
+
+.codeBody pre {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  overflow-x: auto;
+  background: transparent !important;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.codeBody code {
+  font-family: var(--x-font-mono, ui-monospace, monospace);
+}
+
+.codeBody :global(.shiki) span {
+  color: var(--shiki-light);
+}
+
+:global(.dark) .codeBody :global(.shiki) span {
+  color: var(--shiki-dark);
+}
+
+/* Empty state */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 0.25rem 1rem;
+  text-align: center;
+  animation: fade 0.35s ease both;
+}
+
+.emptyMark {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-bottom: 0.9rem;
+  border: 1px solid var(--ai-accent-line);
+  border-radius: 1.25rem;
+  background: radial-gradient(circle at 50% 35%, var(--ai-accent-soft), transparent 75%);
+}
+
+.emptyTitle {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.emptyText {
+  max-width: 22rem;
+  margin: 0 0 1.25rem;
+  color: var(--ai-muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.suggestion {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--ai-border);
+  border-radius: 0.6rem;
+  background: var(--ai-bg);
+  color: var(--ai-text);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.suggestion:hover {
+  border-color: var(--ai-accent-line);
+  background: var(--ai-accent-soft);
+  transform: translateX(2px);
+}
+
+/* Composer */
+
+.composer {
+  padding: 0.6rem 0.85rem 0.7rem;
+  border-top: 1px solid var(--ai-border);
+}
+
+.inputWrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.75rem;
+  border: 1px solid var(--ai-border);
+  border-radius: 0.8rem;
+  background: var(--ai-surface);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.inputWrap:focus-within {
+  border-color: var(--ai-accent);
+  box-shadow: 0 0 0 3px var(--ai-accent-soft);
+}
+
+.input {
+  flex: 1;
+  min-height: 1.6rem;
+  max-height: 180px;
+  padding: 0.2rem 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--ai-text);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.input::placeholder {
+  color: var(--ai-muted);
+}
+
+.send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: var(--ai-accent);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+:global(.dark) .send {
+  color: #06140b;
+}
+
+.send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.disclaimer {
+  margin: 0.45rem 0 0;
+  color: var(--ai-muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+/* Motion */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes sweep {
+  from {
+    background-position: -100% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel *,
+  .panel,
+  .trigger {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .shimmer {
+    color: var(--ai-accent);
+  }
+}

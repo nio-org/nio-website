@@ -1,0 +1,55 @@
+// Nesting record types: a field's type can be another named record type,
+// or a record type declared inline without a name (an anonymous type).
+
+import 'json';
+
+type Engine {
+    float liters;
+    int cylinders;
+    int power 'json:engine_power';    // this field's JSON key is renamed
+}
+
+type Truck {
+    String make;
+    Engine engine;
+    {    // an anonymous type: it only exists as this field
+        String label;
+        int weight;
+    }[] cargo;
+}
+
+// json.parse uses the same renamed keys, and drops every key the type does
+// not declare.
+
+String response = `{
+    "make": "scania",
+    "engine": { "liters": 15.6, "cylinders": 8, "engine_power": 730 },
+    "cargo": [{ "label": "gravel", "weight": 21000 }],
+    "dealer": { "name": "ignored", "phones": ["also ignored"] }
+}`;
+
+Truck fetched = json.parse(response) as Truck;
+print((json.parse(response) as Truck).make);
+print(fetched.make);              // scania
+print(fetched.engine.power);      // 730
+print(fetched.cargo[0].label);    // gravel
+
+Truck t = {
+    make: "volvo",
+    engine: { liters: 12.8, cylinders: 6, power: 550 },
+    cargo: [
+        { label: "timber", weight: 14000 },
+        { label: "steel", weight: 9000 },
+    ],
+};
+
+int total;
+
+forEach(t.cargo, box, i) {
+    print(box.label);
+    total = total + box.weight;
+}
+
+print(total);                    // 23000
+print(t.engine.power);           // 550
+print(json.toText(t.engine));    // {"liters":12.8,"cylinders":6,"engine_power":550}

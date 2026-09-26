@@ -1,0 +1,61 @@
+import 'string';
+import 'json';
+
+String greetings = "hello";
+greetings = greetings + " 2";
+print(greetings);    // hello 2
+
+// Strings are immutable: every function answers a new string and leaves its
+// argument untouched.
+print(string.trim("  Hello, World  "));             // Hello, World
+print(string.toUpperCaseAscii(greetings));          // HELLO 2
+print(string.length(greetings));                    // 7
+print(string.find("my findValue", "findValue"));    // 3
+print(string.replaceAll("a-b-c", "-", "+"));        // a+b+c
+
+String[] parts = string.split("hello - world", "-");
+print(json.toText(parts));                       // ["hello "," world"]
+print(json.toText(string.toByteArray("Az")));    // [65,122]
+
+// Use `join` to build a long string: `s = s + piece` in a loop recopies
+// everything on every round, while `join` copies each byte once.
+print(string.join(parts, "-"));               // hello - world
+print(string.join(["a", "b", "c"], ", "));    // a, b, c
+
+// `from` writes a value the way print does, and the parsers read it back
+// without losing a digit.
+float ratio = 0.1;
+print("ratio = " + string.from(ratio));                            // ratio = 0.1
+print((string.toFloat(string.from(ratio)) catch 0.0) == ratio);    // true
+print(string.toInt(string.from(42)) catch 0);                      // 42
+
+// `...` on the last parameter collects the trailing arguments into an array.
+String joinOf(String sep, ...String pieces) {
+    return string.join(pieces, sep);
+}
+
+print(joinOf(", ", "one", "two", "three"));    // one, two, three
+print(joinOf(", ", "alone"));                  // alone
+print(joinOf(", ") == "");                     // true
+
+// A backtick string interpolates: a `${}` holds anything print accepts, and
+// the whole string is one concatenation however many holes it has. `\${`
+// writes the two characters.
+int n = 3;
+print(`ratio ${ratio}, n = ${n + 1}, ${string.toUpperCaseAscii("up")}`);    // ratio 0.1, n = 4, UP
+print(`a literal \${n} beside ${n}`);                                       // a literal ${n} beside 3
+
+// \xNN writes one byte; \r and \0 are the carriage return and NUL bytes.
+print(json.toText(string.toByteArray("A\r\0")));    // [65,13,0]
+
+// A string is bytes, and a multi-byte character is as many of them as it
+// has. forEach over a string walks code points instead: r is the code point
+// and i the byte offset it starts at.
+String word = "café";
+print(string.length(word));       // 5
+print(string.runeCount(word));    // 4
+forEach(word, r, i) {
+    print(string.from(i) + " " + string.fromRunes([r]));    // 0 c, 1 a, 2 f, 3 é
+}
+print(string.isValidUtf8(string.substring(word, 0, 4)));    // false: half of é
+print(string.toUpperCaseAscii("straße"));                  // STRAßE

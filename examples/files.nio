@@ -1,0 +1,113 @@
+// Reading and writing files. Every fs function but fs.exists raises an Error
+// the caller can catch: a missing file is not a bug in the program.
+// Everything this makes goes in one directory, deleted at the end.
+import 'fs';
+import 'path';
+import 'string';
+import 'array';
+import 'time';
+
+String work = path.join(path.getCwd(), "example-files");
+String note = path.join(work, "example-note.txt");
+String data = path.join(work, "example-data.bin");
+
+// ---- making a directory ----
+
+// createDir makes one directory: the parent must exist, and the path must be free.
+if (!fs.exists(work)) {
+    fs.createDir(work);
+}
+print(fs.stat(work).isDirectory);    // true
+
+// createTempDir creates a directory with a unique name in one step. The
+// prefix only makes it recognisable; the caller must delete the directory.
+String scratch = fs.createTempDir("example-");
+print(scratch != work, fs.readDir(scratch).length);    // true 0
+fs.delete(scratch);
+
+// ---- writing ----
+
+// writeFile takes bytes, not text.
+fs.writeFile(note, string.toByteArray("hello from nio"));
+print(fs.exists(note));    // true
+
+// A second write replaces the contents. There is no append.
+fs.writeFile(note, string.toByteArray("second line"));
+
+// ---- reading ----
+
+byte[] bytes = fs.readFile(note);
+print(string.fromByteArray(bytes));    // second line
+print(bytes.length);                   // 11
+
+// byte is unsigned: 255 is a valid element.
+byte[] raw = [0, 65, 127, 255];
+fs.writeFile(data, raw);
+print(fs.readFile(data).length);    // 4
+
+// ---- stat ----
+
+fs.Stat s = fs.stat(note);
+print(s.name);                                // example-note.txt
+print(s.extension);                           // .txt
+print(s.size, s.isFile, s.isDirectory);       // 11 true false
+print(string.length(s.permissions));          // 9
+print(time.date.toText(s.modified) != "");    // true
+
+// ---- failure is a value ----
+
+String missing = path.join(work, "no-such-file");
+
+// catch with a default: the failure supplies the value instead.
+byte[] empty = fs.readFile(missing) catch [];
+print(empty.length);    // 0
+
+// catch with a block binds the Error.
+fs.readFile(missing) catch e {
+    print(string.contains(e.message, "fs.readFile"));    // true
+};
+
+// Fallibility is inferred: slurp calls a fallible function, so slurp is fallible.
+String slurp(String p) {
+    return string.fromByteArray(fs.readFile(p));
+}
+print(slurp(note));                            // second line
+print(slurp(missing) catch "(unreadable)");    // (unreadable)
+
+// exists is the exception: "not there" is an answer, not a failure.
+print(fs.exists(missing));    // false
+
+// ---- listing a directory ----
+
+// readDir gives entry names only, without "." or "..". No order is promised.
+print(fs.readDir(work).length);    // 2
+
+// A name is not a path: join it to the directory first.
+String[] texts = [];
+forEach(fs.readDir(work), name) {
+    // An entry can vanish between the listing and the stat; the catch skips it.
+    fs.Stat entry = fs.stat(path.join(work, name)) catch e { continue; };
+    if (entry.isFile && entry.extension == ".txt") {
+        array.push(texts, entry.name);
+    }
+}
+print(texts.length);    // 1
+
+// ---- deleting ----
+
+// delete removes one file, or one empty directory.
+fs.delete(data);
+print(fs.exists(data));    // false
+
+// A directory with contents is refused.
+fs.delete(work) catch e {
+    print("not empty yet");    // not empty yet
+};
+
+// recursive deletes the directory and everything under it.
+fs.delete(work, { recursive: true });
+print(fs.exists(work), fs.exists(note));    // false false
+
+fs.delete(note) catch e {
+    print("already gone");    // already gone
+};

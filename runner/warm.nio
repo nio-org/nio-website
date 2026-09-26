@@ -1,0 +1,24 @@
+// Built once when the image is made, so the compiler's object cache holds
+// every runtime file a playground program can link. It imports every built-in
+// module and does nothing else.
+import 'array';
+import 'async';
+import 'crypto';
+import 'fs';
+import 'http';
+import 'json';
+import 'map';
+import 'math';
+import 'net';
+import 'os';
+import 'path';
+import 'process';
+import 'random';
+import 'regexp';
+import 'string';
+import 'test';
+import 'time';
+import 'tls';
+import 'x509';
+
+print("warm");

@@ -1,0 +1,23 @@
+// A library module: see examples/shapes.nio for the program that imports it.
+
+export type Point {
+    int x;
+    int y;
+}
+
+export int pointsMade = 0;
+
+export Point makePoint(int x, int y) {
+    pointsMade = pointsMade + 1;
+    return { x: x, y: y };
+}
+
+export int manhattan(Point a, Point b) {
+    return abs(a.x - b.x) + abs(a.y - b.y);
+}
+
+// Without export, a declaration stays private to the file.
+int abs(int n) {
+    if (n < 0) { return -n; }
+    return n;
+}

@@ -1,0 +1,40 @@
+// Async functions and futures: calling an async function defers its body and
+// answers a Future. Await it, or register a callback with async.run. Whatever
+// is still pending runs after the top-level code.
+import 'async';
+
+int async sum(int a) {
+    return a;
+}
+
+void async announce(String m) {
+    print(m);
+}
+
+// Await forces the future on the spot.
+int mySum = await sum(5);
+print(mySum);    // 5
+
+// A future is a value; awaiting twice runs the body once.
+Future<int> f = sum(21);
+print(await f + await f);    // 42
+
+// Callbacks run when the future completes: here at the end-of-program drain.
+async.run(sum(7), void (int i) -> print(i));
+print("registered");    // registered ... then 7
+
+// Fire and forget: the drain runs pending bodies in call order.
+announce("first");
+announce("second");
+print("top-level");    // top-level, first, second
+
+// An await inside an async function suspends the task and lets others run.
+void async worker(String name) {
+    print(name + " starts");
+    await announce(name + " helper");
+    print(name + " resumes");
+}
+
+worker("A");
+worker("B");
+// ... A starts, B starts, A helper, B helper, A resumes, B resumes

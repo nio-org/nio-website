@@ -1,0 +1,9 @@
+*
+!Dockerfile
+!server.nio
+!warm.nio
+!run.sh
+!slot.sh
+!entrypoint.sh
+!sandbox.cfg
+!sandbox-process.cfg
