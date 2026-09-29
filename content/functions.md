@@ -1,15 +1,15 @@
 ---
 title: "Function values and closures"
-description: "Functions in Nio are values: write them inline, keep them in variables, pass and return them, and capture variables in closures."
+description: "Functions in Nio are values. A program can write them inline, keep them in variables, pass and return them, and capture variables in closures."
 ---
 
 # Function values
 
-Functions in Nio are values: you can create them anonymously, keep them in variables, pass them to and return them from other functions, and store them in record fields and arrays.
+Functions in Nio are values. A program can create them without a name, keep them in variables, pass them to other functions, return them from functions, and store them in record fields and arrays.
 
 ## Function types
 
-A function type spells out the parameter types in parentheses and the return type in angle brackets; `<void>` marks a function that returns nothing:
+A function type gives the parameter types in parentheses and the return type in angle brackets. `<void>` marks a function that returns nothing:
 
 ```nio
 Function(int)<int> f;                 // takes an int, returns an int
@@ -20,13 +20,13 @@ Function()<int>? maybe;               // optional function value
 Function(int, ...String)<void> log;   // variadic
 ```
 
-Two function types are the same exactly when their parameter lists and return types are the same. A function type can appear anywhere a type can — variables, parameters, return types, record fields, array elements, optionals.
+Two function types are the same type when their parameter lists and return types are the same. A function type can be used anywhere that a type can be used: in variables, parameters, return types, record fields, array elements and optionals.
 
-The `...` on a last parameter is part of the type. `Function(...String)<void>` and `Function(String[])<void>` are *different* types, even though both bodies bind a `String[]` — only a call of the first one collects its arguments.
+The `...` on a last parameter is part of the type. `Function(...String)<void>` and `Function(String[])<void>` are *different* types, although both bodies bind a `String[]`. Only a call of the first type collects its arguments into an array.
 
 ## Writing a function value
 
-A function value looks like a function declaration without the name, with `->` before the body. As in declarations, the leading return type is required, and is `void` when the value returns nothing:
+A function value has the form of a function declaration without the name, with `->` before the body. As in a declaration, the return type at the start is necessary. It is `void` when the value returns nothing:
 
 ```nio
 Function(int)<int> double = int (int x) -> x * 2;        // expression body
@@ -36,13 +36,13 @@ print(double(21));      // 42
 hello();                // hi
 ```
 
-`-> expression` returns the expression. `-> { ... }` is an ordinary function body: use `return` inside it, exactly as in a declared function. Parameters are always typed.
+`-> expression` returns the expression. `-> { ... }` is an ordinary function body. It uses `return`, as a declared function does. Parameters always have a type.
 
-Watch the return type: it is never inferred, neither from the body nor from the slot the value goes into. `void (int x) -> x * 2` computes `x * 2` and throws it away; `int (int x) -> x * 2` returns it. The compiler will point out the mismatch if you pick the wrong one.
+The compiler does not infer the return type from the body or from the variable that holds the value. `void (int x) -> x * 2` calculates `x * 2` and discards it. `int (int x) -> x * 2` returns it. If the return type does not match the type that is expected, the compiler shows an error.
 
-Anything holding a function value can be called: a variable (`f(2)`), a record field (`h.run(2)`), an array element (`funcs[0](2)`), even another call's result (`makeAdder(1)(2)`).
+Any expression that holds a function value can be called: a variable (`f(2)`), a record field (`h.run(2)`), an array element (`funcs[0](2)`) or the result of another call (`makeAdder(1)(2)`).
 
-The last parameter can be [variadic](/docs/basics#variadic-parameters), exactly as in a declaration:
+The last parameter can be [variadic](/docs/basics#variadic-parameters), as in a declaration:
 
 ```nio
 Function(...String)<void> shout = void (...String parts) -> {
@@ -57,7 +57,7 @@ shout();                // prints nothing
 
 ## Closures
 
-A function value can use the variables around it. It *captures them by reference*: the function value and its surroundings share the variable, and each side sees the other's assignments — even after the enclosing function has returned:
+A function value can use the variables around it. It *captures them by reference*: the function value and the enclosing code share the variable, and each side sees the assignments of the other. This stays true after the enclosing function has returned:
 
 ```nio
 Function()<int> counter() {
@@ -73,9 +73,9 @@ print(c());           // 1
 print(c());           // 2
 ```
 
-Each call to `counter()` creates a fresh `n`, so two counters never interfere.
+Each call to `counter()` creates a new `n`. Two counters do not affect each other.
 
-Two loop details worth knowing:
+In loops, a `forEach` binding is new for each iteration, but a `for` counter is one variable for the whole loop:
 
 ```nio
 import 'array';
@@ -94,7 +94,7 @@ for (int k = 0; k < 3; k++) {
 print(shared[0]());   // 3 — every closure shares the same k
 ```
 
-Module-level variables are not captured; a function value reads and writes them directly, like any function body does.
+Module-level variables are not captured. A function value reads and writes them directly, as any function body does.
 
 ## Passing and returning functions
 
@@ -111,13 +111,13 @@ print(apply(int (int n) -> n * n, 7));  // 49
 print(makeAdder(40)(2));                // 42
 ```
 
-A *declared* function's name is not a value yet — `apply(add, 1)` is a compile error. Wrap it: `apply(int (int x) -> add(x, 1), 2)`. The same goes for a [method](/docs/basics#methods), where the wrapper also remembers which value to call it on: `apply(int (int x) -> myCar.age(x), 2026)`.
+The name of a *declared* function is not a value yet. As a result, `apply(add, 1)` is a compile error. The call goes in a function value instead: `apply(int (int x) -> add(x, 1), 2)`. The same rule applies to a [method](/docs/basics#methods). The function value also holds the value that the method is called on: `apply(int (int x) -> myCar.age(x), 2026)`.
 
-## Function fields or methods?
+## Function fields and methods
 
-Both put behavior on a record, and they answer different questions.
+Both add behavior to a record, for different purposes.
 
-A function-typed **field** holds a value, so it can differ from one record to the next — a comparator, a retry hook, a callback handed in at construction. Being a closure, it captures the variables around where it was written and knows nothing about the record it ends up in: a field cannot read its own record's other fields.
+A function-typed **field** holds a value. It can be different in each record. Examples are a comparator, a retry hook, or a callback that the code supplies when it builds the record. The field holds a closure. It captures the variables around the place where it was written. It cannot read the other fields of the record that holds it.
 
 ```nio
 type Job {
@@ -126,7 +126,7 @@ type Job {
 }
 ```
 
-A [method](/docs/basics#methods) belongs to the type. Every value of the type shares it, it reads and writes the value it was called on through `self`, it costs the record no storage, and it never has to be filled in when a value is built:
+A [method](/docs/basics#methods) belongs to the type. All values of the type share it. It reads and writes the value that it was called on through `self`. It uses no storage in the record, and the code that builds a value does not supply it:
 
 ```nio
 type Job {
@@ -138,11 +138,11 @@ type Job {
 }
 ```
 
-Rule of thumb: if the behavior is the same for every value of the type, make it a method; if the behavior is data the caller supplies, make it a field.
+A method is the correct choice when the behavior is the same for all values of the type. A field is the correct choice when the caller supplies the behavior as data.
 
-## The fine print
+## Other rules
 
-* The zero value of a function type is a null function; calling it is a runtime error (`Function()<void> f; f();` stops the program). Assign before calling, or use `Function()<void>?` and [narrow](/docs/basics#optionals-t) before the call:
+* The zero value of a function type is a null function. A call to a null function is a runtime error: `Function()<void> f; f();` stops the program. A program assigns a value before the call, or it uses `Function()<void>?` and [narrows](/docs/basics#optionals-t) it before the call:
 
 ```nio
 Function()<void>? task;
@@ -151,6 +151,6 @@ if (task != null) {
 }
 ```
 
-* Function values cannot be compared with `==` or printed, and they have no JSON form. As a [record field](/docs/stdlib/json#function-typed-fields) one is simply omitted from the output; `json.toText` still rejects a function passed on its own, or inside an array or optional.
-* After `->`, a `{` always starts a block body. To return a record literal from an expression body, parenthesize it: `Car () -> ({ make: "a", age: 1 })`.
-* Like everything else on the heap, closures are garbage collected: a captured variable lives as long as some function value can still reach it.
+* Function values cannot be compared with `==` or printed, and they have no JSON form. A function value in a [record field](/docs/stdlib/json#function-typed-fields) is not included in the output. `json.toText` rejects a function value that is passed directly, or inside an array or an optional.
+* After `->`, a `{` always starts a block body. An expression body that returns a record literal must put it in parentheses: `Car () -> ({ make: "a", age: 1 })`.
+* Closures are garbage collected, like all other values on the heap. A captured variable stays alive while a function value can reach it.

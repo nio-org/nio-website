@@ -1,14 +1,13 @@
 ---
 title: "Formatting code with nio format"
-description: "nio format rewrites Nio code in one canonical style, with no options to configure. See what it changes and what it leaves alone."
+description: "nio format rewrites Nio code in one canonical style, with no options to configure. This page tells what it changes and what it leaves alone."
 ---
 
 # Formatting
 
-`nio format` rewrites Nio source in one canonical style. It takes no options,
-and that is the whole point of it: a style nobody configures is a style nobody
-argues about, and every diff in a project is a change to the program rather
-than to somebody's preference.
+`nio format` rewrites Nio source in one canonical style. It has no options.
+Every project uses the same style. As a result, a diff shows only changes to
+the program.
 
 ```sh
 nio format .                       # rewrite every .nio file under here
@@ -17,22 +16,23 @@ nio format -l .                    # name the files that are not formatted,
                                    #   change nothing, and exit 1 if any
 ```
 
-A directory means every `.nio` file under it, `.git` and `node_modules`
-excepted. `-l` is the form for a continuous-integration check: it writes
+A directory means every `.nio` file under it, except in `.git` and
+`node_modules`. `-l` is for a continuous-integration check. It writes
 nothing, prints the paths that would change, and exits 1 when the list is not
 empty.
 
-A file that does not parse is reported and left exactly as it was. The
-formatter prints a tree, so it can only work from a tree it actually got.
+If a file has a syntax error, `nio format` reports it and does not change the
+file.
 
 ## What it decides, and what it leaves alone
 
-The formatter settles the indent (four spaces a level), the space around every
-token, how many blank lines separate two statements (one, wherever the file
-had one or more), and the column a trailing comment sits at.
+The formatter sets the indent (four spaces for each level), the spaces around
+each token, the number of blank lines between two statements, and the column
+of a trailing comment. Where the file has one or more blank lines between two
+statements, the formatter writes one.
 
-It does **not** decide where a construct breaks over lines. That stays the
-file's decision, and it is kept as the file made it:
+It does **not** change where a construct breaks over lines. The formatter
+keeps the line breaks of the file:
 
 ```nio
 // Both of these are formatted. Neither becomes the other.
@@ -43,14 +43,16 @@ if (ready) {
 }
 ```
 
-The same holds for an argument list, a literal, an operator chain and an
-`else` chain. If you wrote it on one line it stays on one line; if you broke
-it, it stays broken in the same places, re-indented. There is no line-length
-limit, because a limit would have to move breaks the author chose.
+The same rule applies to an argument list, a literal, an operator chain and
+an `else` chain. If the file has it on one line, it stays on one line. If
+the file breaks it over lines, it stays broken at the same places, with a new
+indent.
+There is no line-length limit.
 
-Two things follow from a construct being broken. A literal whose closing
-bracket ends up on a line of its own keeps it there and gets a comma after its
-last element, so that adding another element touches one line:
+A construct that is broken over lines gets two more changes. When the closing
+bracket of a literal is on its own line, it stays there, and the formatter
+adds a comma after the last element. Then, when an element is added, only one
+line changes:
 
 ```nio
 byte[] const HEADER = [
@@ -59,17 +61,18 @@ byte[] const HEADER = [
 ];
 ```
 
-And an operator that opens a line reads at the front of it, under the operand
-it continues:
+An operator that starts a line goes at the start of that line, under the
+operand that it continues:
 
 ```nio
 return Error("pins is empty, so no peer can match it; leave it null to "
     + "verify without pinning", ErrorCode.MISCONFIGURED);
 ```
 
-Comments keep their place. Prose above a declaration stays above it, a remark
-trailing code stays on that line, and a run of trailing comments on
-neighbouring lines lines up on the longest of them:
+Comments stay in their positions. A comment above a declaration stays above
+it, and a comment after code stays on that line. When neighbouring lines have
+trailing comments, the formatter aligns them in one column, set by the
+longest line:
 
 ```nio
 type Unit {
@@ -81,27 +84,20 @@ type Unit {
 
 ## What it will not change
 
-Formatting changes whitespace. It does not change a single token, and the test
-suite holds it to that over every `.nio` file in the Nio repository: the file
-is lexed before and after, and the two token streams must match.
+The formatter changes only whitespace. It does not change any token.
 
-That is stronger than it sounds, and it rules out the mistakes a formatter is
-otherwise prone to. Grouping parens are written back exactly where the file
-put them, rather than re-derived from a precedence table — so `(a && b) || c`
-keeps its parens even though it does not need them. A string is written back
-with the delimiter it was written with, so a backtick string holding a program
-is not requoted into `"` with `\n` escapes. A number keeps its spelling, `0x1f`
-included. A `union` is written back as a `union`, though the parser has by
-then turned it into a sealed type and one extender per member.
+The formatter writes grouping parentheses where the file has them. It does
+not calculate them from operator precedence. As a result, `(a && b) || c`
+keeps its parentheses, although they are not necessary. A string keeps its
+delimiter. A backtick string that holds a program does not change to a `"`
+string with `\n` escapes. A number keeps its spelling, for example `0x1f`. A `union`
+stays a `union`.
 
-The one thing the formatter adds is punctuation the grammar lets you leave
-out: the `;` after a statement that ends in a brace, the `;` after the last
-field of a body, and the `,` after the last element of a broken list. The
-standard style always writes those.
+The formatter adds only punctuation that the grammar lets a file omit: the `;`
+after a statement that ends with a brace, the `;` after the last field of a
+body, and the `,` after the last element of a list that is broken over lines.
+The standard style always writes these.
 
 ## Formatting twice
 
-Formatting an already-formatted file changes nothing. That is not an aspiration
-but a test, run over the whole repository on every build, together with the
-requirement that every file in it is already formatted. The repository is the
-formatter's own corpus.
+Formatting a file that is already formatted changes nothing.

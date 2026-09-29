@@ -7,15 +7,15 @@ description: "The basics of Nio: built-in types, variables, strings, optionals, 
 
 ## Programs
 
-A program is a sequence of top-level statements in a single `.nio` file, executed in order from top to bottom. There is no `main` function.
+A program is a sequence of top-level statements in a single `.nio` file. The statements run in order from top to bottom. There is no `main` function.
 
 ```nio
 print("hello, world");
 ```
 
-Every statement ends with `;`, except statements whose last token is `}` (blocks, declarations, record literals), where the semicolon is optional.
+Every statement ends with `;`. The semicolon is optional after a statement whose last token is `}` (blocks, declarations, record literals).
 
-Comments come in two forms — `//` to the end of the line, and `/* */` over as many lines as you like:
+There are two forms of comment. `//` continues to the end of the line, and `/* */` can span many lines:
 
 ```nio
 // a line comment
@@ -26,9 +26,9 @@ Comments come in two forms — `//` to the end of the line, and `/* */` over as 
 int x = 1 /* or between tokens */ + 2;
 ```
 
-Block comments do not nest: the first `*/` closes the comment, whatever comes before it.
+Block comments do not nest. The first `*/` closes the comment.
 
-A comment means nothing to the compiler — two programs differing only in their comments produce the same binary. Your editor reads them, though, and there is one place it looks: **the comment block on the lines directly above a declaration**. That is what an editor shows when you hover the name, wherever it is used and whichever file it was imported from.
+Comments have no effect on the compiled program. Two programs that differ only in their comments produce the same binary. Editors use one kind of comment: **the comment block on the lines directly above a declaration**. A hover over the name shows this block in the editor. This applies wherever the name is used, also in a file that imports it.
 
 ```nio
 // A file comment. The blank line below is what keeps it the file's.
@@ -40,18 +40,18 @@ int add(int a, int b) { return a + b; }
 int seen = 0;   // a remark about seen, and about nothing after it
 ```
 
-Consecutive `//` lines are one block, either form counts, and a blank line ends it.
+Consecutive `//` lines make one block. Both comment forms count. A blank line ends the block.
 
 ## Printing
 
-`print` and `printInline` write to standard output. They differ in one thing: `print` ends the line, `printInline` does not.
+`print` and `printInline` write to standard output. `print` ends the line, and `printInline` does not.
 
 ```nio
 printInline("hello, ");
 print("world");            // hello, world
 ```
 
-Both take any number of values, written with a single space between two of them — and nothing before the first or after the last, apart from `print`'s newline:
+Both take any number of values. They write one space between two values. They write nothing before the first value or after the last value, except the newline from `print`:
 
 ```nio
 print("x", 1, true);               // x 1 true
@@ -59,9 +59,9 @@ print();                           // an empty line
 printInline("a", "b");             // a b, with the next print continuing the line
 ```
 
-They take scalars: strings, any number type, `bool`, `DateTime`, `Duration`, and enums, or an optional of one of those. Strings print unquoted, an absent optional prints `null`, and records, arrays, and maps go through [`json.toText`](/docs/stdlib/json) first.
+They accept scalars: strings, all number types, `bool`, `DateTime`, `Duration`, enums, and optionals of these types. Strings print without quotes, and an absent optional prints `null`. To print a record, an array or a map, a program first converts it with [`json.toText`](/docs/stdlib/json).
 
-Every argument is evaluated before anything is written, so an argument that [raises an error](/docs/errors) leaves nothing behind on the line.
+All arguments are evaluated before output starts. If an argument [raises an error](/docs/errors), nothing is written.
 
 ## Built-in types
 
@@ -87,13 +87,13 @@ Every argument is evaluated before anything is written, so an argument that [rai
 
 > [!NOTE]
 >
-> **Numeric types do not mix.** `1 + 1.5` is a compile error — write `1.0 + 1.5`. There are no implicit conversions between the integers and the floats, and none between the signed and unsigned integers either.
+> **Numeric types do not mix.** `1 + 1.5` is a compile error. The correct form is `1.0 + 1.5`. There are no implicit conversions between integers and floats, or between signed and unsigned integers.
 
 ### Picking a number type
 
-`int` and `float` are the ones to reach for. They are as wide as the machine you build for — 64 bits on a 64-bit machine, 32 on a 32-bit one — and they are types of their own, not other spellings of `int64` and `float64`. `uint` is the same thing for the unsigned family.
+`int` and `float` are the default choices. They have the width of the target machine: 64 bits on a 64-bit machine, 32 bits on a 32-bit machine. They are separate types, not other names for `int64` and `float64`. `uint` is the unsigned equivalent of `int`.
 
-The sized types are for when the width is part of what the program *means*: a wire format, a file header, a JSON contract that promises a small number.
+The sized types are for data where the width is part of the data definition, for example a wire format, a file header, or a JSON contract that specifies a small number.
 
 ```nio
 int count = 0;                 // the default choice
@@ -101,7 +101,7 @@ int32 recordId = 70000;        // 32 bits because the format says so
 float32 temperature = 21.5;    // and 32-bit floats because it says that too
 ```
 
-Anything narrower than `int` or `float` is a **storage type**: it holds a value and passes it around, but no operator produces one. To put a computed value back into one, write the conversion — see [Converting between number types](#converting-between-number-types).
+A type narrower than `int` or `float` is a **storage type**. It holds a value and passes it on, but no operator produces one. A computed value needs a conversion before it can go into a storage type. [Converting between number types](#converting-between-number-types) gives the details.
 
 ```nio
 int16 a = 300;
@@ -111,7 +111,7 @@ int16 nope = a + b;            // compile error: cannot use int as int16
 a++;                           // compile error, for the same reason
 ```
 
-Values move to any numeric type that holds **every** value of their own, and never back the other way:
+A value can move to a numeric type that holds **every** value of its own type. It cannot move in the other direction:
 
 ```nio
 int8 small = 100;
@@ -121,7 +121,7 @@ float64 g = f;                 // fine
 int8 back = wider;             // compile error: cannot use int32 as int8
 ```
 
-Literals are checked against the type they are going into, so a number that does not fit is caught at compile time rather than silently wrapping:
+The compiler checks each literal against its target type. A number that does not fit is a compile error. It does not wrap:
 
 ```nio
 int8 ok = 127;
@@ -130,7 +130,7 @@ int8 tooBig = 200;             // compile error: cannot use int as int8
 
 ### The unsigned types
 
-`uint`, `uint8`, `uint16`, `uint32` and `uint64` hold no negative value. They are what a program reaches for when a number cannot be negative in the first place — a count, a size, a bit pattern, a byte. `byte` is an alias for `uint8`, which is why every element of `string.toByteArray`, `fs.readFile` and a child's output is 0–255:
+`uint`, `uint8`, `uint16`, `uint32` and `uint64` hold no negative values. They are for numbers that cannot be negative: a count, a size, a bit pattern, a byte. `byte` is an alias for `uint8`. For this reason, each element that `string.toByteArray`, `fs.readFile` and the output of a child process give is in the range 0–255:
 
 ```nio
 import 'string';
@@ -141,7 +141,7 @@ uint total = 0;
 total = total - 1;             // 18446744073709551615 — unsigned wraps
 ```
 
-They are a **family of their own**. An unsigned value and a signed one never meet in an operator, because neither type holds the other's values:
+**Signed and unsigned types do not mix.** An operator cannot take one signed operand and one unsigned operand, because neither type holds all the values of the other:
 
 ```nio
 int i = 1;
@@ -150,7 +150,7 @@ bool oops = i < u;             // compile error: not defined on int and uint
 uint bad = -u;                 // compile error: no negative values to produce
 ```
 
-What does work is the pair where one side holds the other outright, and a plain number written next to an unsigned value:
+Two combinations are allowed: a pair where one type holds all the values of the other, and a number literal next to an unsigned value:
 
 ```nio
 byte b = 200;
@@ -160,7 +160,7 @@ print(count == 3, count > 0);  // true true — the literal takes the uint type
 ```
 
 
-A `float32` literal is rounded to the nearest 32-bit value, which is not an error — `0.1` is inexact at any width. It does mean a `float32` is not equal to the 64-bit literal that looks like it:
+A `float32` literal is rounded to the nearest 32-bit value. This is not an error, because `0.1` is inexact at every width. But a `float32` value is not equal to the 64-bit literal with the same digits:
 
 ```nio
 float32 tenth = 0.1;
@@ -171,7 +171,7 @@ print(tenth + tenth);        // 0.20000000298023224  (the sum is a float64)
 
 ### Writing a number in hexadecimal
 
-An integer literal can be written as `0x` (or `0X`) and hexadecimal digits. Both cases work in the prefix and in the digits:
+An integer literal can also be `0x` (or `0X`) followed by hexadecimal digits. Upper case and lower case both work, in the prefix and in the digits:
 
 ```nio
 int  mask  = 0xFF;             // 255
@@ -182,9 +182,9 @@ int  low   = -0x80;            // −128 — a minus applied to the literal
 print(0x10 == 16);             // true
 ```
 
-This is a second **spelling**, not a second kind of value: `0xFF` and `255` are the same literal afterwards, with the same type and the same range check against a narrower type. Which to write is a question about the reader — a mask, a byte, or a value copied out of a wire format or a published constant table reads as hexadecimal, and a count does not.
+Hexadecimal is a different notation for the same value. `0xFF` and `255` are the same literal, with the same type and the same range check against a narrower type. Hexadecimal makes some code easier to read, for example a mask, a byte, or a value copied from a wire format or a published table of constants.
 
-It works anywhere an integer literal does, including the three places that are not expressions — a map key, an enum member's value, and a fixed-size array's length:
+Hexadecimal works in all places where an integer literal works. This includes the three places that are not expressions: a map key, the value of an enum member, and the length of a fixed-size array:
 
 ```nio
 enum Mask { LOW: 0x0F, HIGH: 0xF0 }
@@ -192,15 +192,15 @@ Map<int, String> names = { 0xFF: "high" };
 int[0x4] quad = [1, 2, 3, 4];
 ```
 
-Three things it does not do:
+Limits:
 
-* There is **no hexadecimal float**. The notation is for integers, so `0x1.8` is `0x1` followed by something the parser has no use for.
-* A `0x` with **no digit** after it is an error naming itself, rather than a `0` and an identifier called `x`.
-* The range is still an `int64`'s, whichever notation writes it. `0x7FFFFFFFFFFFFFFF` is the largest literal there is, and `0xFFFFFFFFFFFFFFFF` is out of range rather than every bit of a `uint64` — worth knowing precisely because hexadecimal is where you would reach for such a mask. The top half of a `uint64` still comes from arithmetic, from JSON, or from outside the program.
+* There is **no hexadecimal float**. The compiler reads `0x1.8` as `0x1` followed by text that is not valid at that position.
+* A `0x` with no digit after it is an error. The compiler does not read it as `0` followed by an identifier `x`.
+* The range is the range of `int64`, in both notations. `0x7FFFFFFFFFFFFFFF` is the largest literal. `0xFFFFFFFFFFFFFFFF` is out of range. It does not give a `uint64` with all bits set. A value in the top half of the `uint64` range can come from arithmetic, JSON, or input from outside the program.
 
 ### Working with bits
 
-The integer types have the usual bitwise operators: `&`, `|`, `^`, `~`, `<<` and `>>`. They read a value as bits rather than as a number, and are defined on integers only — a float's bits are a sign, an exponent and a mantissa, so masking them is never what you mean.
+The integer types have the bitwise operators `&`, `|`, `^`, `~`, `<<` and `>>`. These operators use the bits of a value, not its numeric value. They are defined only on integers.
 
 ```nio
 int a = 12;                    // 1100
@@ -210,7 +210,7 @@ print(~a);                     // -13
 print(a << 3, a >> 2);         // 96 3
 ```
 
-`>>` fills with whatever the **left** operand's type says: the sign for a signed type, zeros for an unsigned one. The right operand is a count, so it can be any integer type.
+The type of the **left** operand sets how `>>` fills the empty bits: with the sign for a signed type, and with zeros for an unsigned type. The right operand is a count, and it can be any integer type.
 
 ```nio
 print(-13 >> 2);               // -4  — the sign keeps coming
@@ -218,19 +218,19 @@ uint u = 12;
 print(u >> 2);                 // 3   — zeros come in
 ```
 
-The bitwise operators bind tighter than comparisons: `|` and `^` bind like `+`, and `&`, `<<` and `>>` bind like `*`. That means the comparison below reads the way it looks:
+The bitwise operators bind tighter than comparisons. `|` and `^` bind like `+`, and `&`, `<<` and `>>` bind like `*`. As a result, the comparison below does not need parentheses:
 
 ```nio
 print(a & 12 == 12);           // true — (a & 12) == 12
 ```
 
-Shifting by more than the type is wide gives `0` (or `-1` for `>>` on a negative value) rather than something undefined. A **negative** shift count is a runtime error, since it is a shift in a direction you did not ask for.
+A shift by the width of the type or more gives `0`, or `-1` for `>>` on a negative value. The result is always defined. A **negative** shift count is a runtime error.
 
-One spelling rule: `>>` must be written as two `>` with nothing between them, so that `Map<String, Future<int>>` still closes two type arguments rather than shifting.
+The `>>` operator is two `>` characters with nothing between them. `Map<String, Future<int>>` closes two type arguments and is not a shift.
 
 ### Converting between number types
 
-Every operator widens its result (see [Picking a number type](#picking-a-number-type)), so `a + b` on two `byte`s is a `uint`. To put a computed value back into a narrower type, write `as`:
+Every operator widens its result (see [Picking a number type](#picking-a-number-type)). As a result, `a + b` on two `byte` values is a `uint`. The `as` operator converts a computed value to a narrower type:
 
 ```nio
 byte a = 200;
@@ -239,20 +239,20 @@ byte sum = (a + b) as byte;        // 255
 byte over = (a + b + 1) as byte;   // 256 wraps round to 0
 ```
 
-This is the only way to compute a `byte` — without it, nothing an operator produces will fit back in one. It always succeeds and it wraps, keeping the target type's low bits.
+`as` is the only way to compute a `byte`, because no operator result fits in one. The conversion always succeeds. It wraps, and keeps the low bits that fit in the target type.
 
-It also reinterprets between the signed and unsigned families at the same width, which assignment refuses:
+`as` also converts between the signed and unsigned families at the same width, which assignment does not allow. The bits do not change:
 
 ```nio
 int i = -1;
 print(i as uint);              // 18446744073709551615 — the same bits, read unsigned
 ```
 
-It does **not** convert between integers and floats. That asks about rounding and about values no integer can hold, so it is refused rather than guessed at.
+`as` does **not** convert between integers and floats, because that conversion needs a rounding rule and some values have no equivalent in the other type. [`math.toInt` and `math.toFloat`](/docs/stdlib/math) do these conversions.
 
 ### Writing a string
 
-A string literal is written with double quotes, single quotes, or backticks. All three produce the same kind of value, so the choice is only about what you would otherwise have to escape:
+A string literal uses double quotes, single quotes or backticks. All three give the same kind of value. A program can use the form that needs the fewest escapes:
 
 ```nio
 String a = "hello";
@@ -263,9 +263,9 @@ String awkward = "she said \"hi\"";
 String better  = 'she said "hi"';    // the same string, nothing escaped
 ```
 
-The escapes are `\n`, `\r`, `\t`, `\0` (a NUL byte), `\\`, `\$`, each of the three quotes — `\"`, `\'`, `` \` `` — and `\xNN` for the byte with that two-digit hex value (`"\x41"` is `"A"`; both digits are required). A backslash before anything else is kept as written. `\xNN` writes one byte, not a character: a string is bytes, so `"\xC3\xA9"` is `é` and `"\xE9"` on its own is not valid UTF-8.
+The escapes are `\n`, `\r`, `\t`, `\0` (a NUL byte), `\\`, `\$`, the three quotes (`\"`, `\'` and `` \` ``), and `\xNN` for the byte with the two-digit hexadecimal value NN. For example, `"\x41"` is `"A"`. Both digits are required. A backslash before any other character stays in the string. `\xNN` writes one byte, not one character. A string is a sequence of bytes. As a result, `"\xC3\xA9"` is `é`, and `"\xE9"` alone is not valid UTF-8.
 
-A `"` or `'` string has to fit on one line. A **backtick string does not**, and every newline you write in it is part of it:
+A `"` or `'` string must fit on one line. A **backtick string** can span many lines, and each newline in it is part of the string:
 
 ```nio
 String note = `dear reader,
@@ -275,7 +275,7 @@ regards`;
 print(note == "dear reader,\n\nregards");   // true
 ```
 
-That makes backticks the natural way to hold a block of text — a JSON payload, a usage message, a query — with its shape intact:
+A backtick string can hold a block of text that must keep its layout, for example a JSON payload, a usage message or a query:
 
 ```nio
 String usage = `usage: report [options] <file>
@@ -286,9 +286,9 @@ String usage = `usage: report [options] <file>
 
 > [!NOTE]
 >
-> Indentation inside a backtick string is part of the string. There is no margin stripping, so a line indented to line up with the surrounding code carries that indentation into the value — which is why the example above starts its lines at column 1.
+> Indentation inside a backtick string is part of the string. Nio does not remove a margin. If the lines are indented to align with the code around them, the value contains that indentation. For this reason, the lines in the example above start at column 1.
 
-Backticks change one more thing: **they interpolate.** `${expr}` inside a backtick string is replaced by the text the value prints as, so anything `print` accepts can sit in a hole, and nothing needs importing:
+Backtick strings also **interpolate**. In a backtick string, each `${expr}` (a *hole*) is replaced by the text that `print` writes for the value. A hole can hold any value that `print` accepts, and no import is necessary:
 
 ```nio
 String who = "world";
@@ -296,9 +296,9 @@ int n = 3;
 print(`hello ${who}, n = ${n + 1}`);    // hello world, n = 4
 ```
 
-It is exactly the concatenation it reads as — `` `n = ${n}` `` means `"n = " + string.from(n)` — and it costs one allocation however many holes it has. Braces inside a hole balance, so a record literal or another backtick string can sit in one. Write `\${` for a literal `${`; a `$` that is not followed by `{` needs no escape. The other two forms never interpolate: `"${n}"` is those four characters, which is what you want when the string is going to a shell.
+`` `n = ${n}` `` is the same as `"n = " + string.from(n)`. The result needs one allocation for any number of holes. Braces inside a hole must balance. A hole can contain a record literal or another backtick string. `\${` gives a literal `${`. A `$` that is not followed by `{` needs no escape. The other two quote forms never interpolate: `"${n}"` is those four characters. They are the correct form for a string that goes to a shell.
 
-Because a quoted string stops at the end of its line, a forgotten closing quote is reported on the line that has the mistake instead of swallowing everything after it:
+A quoted string stops at the end of its line. As a result, the compiler reports a missing closing quote on the line that has the mistake, and does not read the rest of the file as part of the string:
 
 ```nio
 String oops = "hello;
@@ -307,7 +307,7 @@ String oops = "hello;
 
 ## Strings are bytes
 
-A `String` is a sequence of bytes, and every position and length in the language is a byte position or a byte count. That is worth stating loudly, because the text you type is UTF-8 and most of the world's characters are more than one byte of it:
+A `String` is a sequence of bytes. Every position and length in the language is a byte position or a byte count. Source text is UTF-8, and many characters use more than one byte:
 
 ```nio
 import 'string';
@@ -318,9 +318,9 @@ print(word[3]);                     // 195, the first byte of é
 print(string.substring(word, 0, 4)); // "caf" plus half of é: not valid UTF-8
 ```
 
-Nothing stops the last line, and nothing warns. If you are cutting a display name to fit a column, that is the bug you ship.
+The compiler accepts the last line without an error or a warning. Text cut at a byte offset, for example to fit a display name in a column, can be invalid UTF-8.
 
-Correct code walks **code points**, and the loop that does it is the same loop as for an array:
+To work with characters, a program iterates over **code points**, with the same `forEach` loop as for an array:
 
 ```nio
 forEach(word, r, i) {    // r: the code point, an int; i: the byte offset it starts at
@@ -332,13 +332,20 @@ forEach(word, r, i) {    // r: the code point, an int; i: the byte offset it sta
 // 3 é       <- i steps from 3 to 5, because é is two bytes
 ```
 
-A byte that is not valid UTF-8 comes out as `0xFFFD` and the loop moves one byte on, so the loop always ends and never skips a byte. Four functions answer what a walk does not: `string.runeCount(s)` is how many code points the walk visits (4 for `café`), `string.runeAt(s, i)` is the code point at a **byte** offset, `string.fromRunes(rs)` builds a string from code points, and `string.isValidUtf8(s)` says whether a string is whole. There is no function that hands back the code points as an array, on purpose: it is the kind of helper people skip on a hot path, and a byte loop is not slower, it is *wrong*. The loop is the short spelling and the correct one.
+A byte that is not valid UTF-8 gives `0xFFFD`, and the loop moves on by one byte. As a result, the loop always ends and visits every byte. Four more functions work with code points:
 
-Case mapping is ASCII only, and the functions are named for it: `string.toUpperCaseAscii` and `string.toLowerCaseAscii`. Full Unicode case mapping is a table that belongs in a package, not in the core.
+* `string.runeCount(s)` returns the number of code points that the loop visits (4 for `café`).
+* `string.runeAt(s, i)` returns the code point at the **byte** offset `i`.
+* `string.fromRunes(rs)` makes a string from code points.
+* `string.isValidUtf8(s)` returns whether a string is valid UTF-8.
+
+No function returns the code points as an array. The `forEach` loop walks them one at a time. A loop over bytes gives incorrect results for multi-byte characters.
+
+Case mapping applies only to ASCII. The case-mapping functions are `string.toUpperCaseAscii` and `string.toLowerCaseAscii`. The standard library has no full Unicode case mapping.
 
 ## Naming a type: `getType`
 
-`getType(value)` returns the name of a value's type as a `String`. Like `print`, it is always available and needs no import:
+`getType(value)` returns the name of the type of a value, as a `String`. Like `print`, it is always available and needs no import:
 
 ```nio
 int8[] bytes = [1, 2];
@@ -348,7 +355,7 @@ print(getType(1.5));         // float
 print(getType("hi") + "!");  // String!
 ```
 
-It takes anything but a `void` value. Where printing refuses records, arrays, and maps, `getType` names them happily:
+It accepts any value except a `void` value. `print` does not accept records, arrays and maps, but `getType` does:
 
 ```nio
 type Car { String make; int age; }
@@ -359,20 +366,20 @@ print(getType([c]));                   // Car[]
 print(getType(int (int n) -> n * 2));  // Function(int)<int>
 ```
 
-The name you get back is spelled the way compile errors spell it. Two things follow from that:
+The returned name has the same spelling as in compile errors. As a result:
 
-* `byte` is an alias for `uint8`, and the alias is not remembered: a `byte` value reports `uint8`. `int`, `uint` and `float` are not aliases, so they report themselves — `getType(1)` is `int`, never `int64`, however wide the machine makes it.
-* A type from another module is named by the module that *declared* it, not by your alias for it. With `import 'shapes' as sh;`, an `sh.Circle` reports `shapes.Circle`.
+* `byte` is an alias for `uint8`, and the name of the alias is not kept: a `byte` value reports `uint8`. `int`, `uint` and `float` are not aliases. They report their own names. `getType(1)` is `int`, never `int64`, on all machines.
+* A type from another module has the name of the module that *declared* it, not the name of the import alias in the importing file. With `import 'shapes' as sh;`, an `sh.Circle` reports `shapes.Circle`.
 
 > [!NOTE]
 >
-> **`getType` answers at compile time.** The type is baked into the program as a constant string — there is no run-time type information behind it. The argument is still evaluated, so side effects in it still happen; only its value is thrown away.
+> **`getType` is evaluated at compile time.** The type name is a constant string in the program. There is no run-time type information. The argument is still evaluated. Its side effects still occur, but its value is discarded.
 >
-> This is also why `getType` reports the type you *declared*, ignoring [narrowing](#narrowing): a `String?` reports `String?` even inside an `if (s != null)` where it is otherwise usable as a `String`.
+> For the same reason, `getType` reports the *declared* type and ignores [narrowing](#narrowing). A `String?` reports `String?`, also inside `if (s != null)`, where it is usable as a `String`.
 
 ## Declaring variables
 
-A declaration is a type followed by a name, with an optional initializer. Without an initializer, the variable starts at its type's zero value:
+A declaration is a type followed by a name, with an optional initializer. A variable without an initializer starts at the zero value of its type:
 
 ```nio
 int x;                 // 0
@@ -381,13 +388,13 @@ String name = "ada";
 bool ready = x < y;
 ```
 
-Variables must be declared before use. A name cannot be redeclared in the same scope, but inner blocks may shadow outer names.
+A variable must be declared before its first use. A name cannot be declared two times in the same scope, but an inner block can shadow a name from an outer block.
 
-### Names you cannot use
+### Reserved names
 
-Four names are taken everywhere: `print`, `printInline`, `getType`, and `Error`. They are in scope in every file and no import brings them in, so declaring one could only hide it. The same goes for record and enum *types*: they may not be named after a built-in type (`int`, `String`, `DateTime`, …).
+Four names are reserved everywhere: `print`, `printInline`, `getType` and `Error`. They are in scope in every file without an import, and no variable or type can have one of these names. Record and enum *types* also cannot have the name of a built-in type (`int`, `String`, `DateTime`, …).
 
-The names of the standard library's modules — `json`, `path`, `http` and the rest — are **not** on that list. A module's name is taken only in a file that [imports](/docs/modules) it:
+The names of the standard library modules, such as `json`, `path` and `http`, are **not** reserved. A module name is taken only in a file that [imports](/docs/modules) the module:
 
 ```nio
 String path = "/usr/local";    // fine: this file does not import 'path'
@@ -399,7 +406,7 @@ import 'path';
 String path = "/usr/local";    // compile error: "path" is already used as a module name
 ```
 
-Importing under another name gives the name back, which is how a file has both:
+A file that uses both imports the module under a different name:
 
 ```nio
 import 'path' as p;
@@ -408,17 +415,17 @@ String path = "/usr/local";
 print(p.join(path, "bin"));  // /usr/local/bin
 ```
 
-Using a library you did not import says so rather than calling it undefined:
+A use of a library that the file does not import is a compile error. The message says to import the library:
 
 ```nio
 print(path.join("a", "b"));  // compile error: path is a built-in library; import it first: import 'path';
 ```
 
-Field and method names are never restricted — they are reached through a value, so `item.print()` calls your method and `print(x)` the built-in.
+Field and method names have no restrictions, because code accesses them through a value. `item.print()` calls the method of the type, and `print(x)` calls the built-in function.
 
 ### `const` variables
 
-Adding `const` between the type and the name makes the variable impossible to reassign. A const variable must be initialized when declared:
+`const` between the type and the name prevents reassignment. A const variable must have an initializer:
 
 ```nio
 String const greeting = "ciao";
@@ -428,7 +435,7 @@ int const limit = 10;
 limit++;                       // compile error
 ```
 
-`const` freezes the *name*, not the value it refers to. An array or record held by a const variable stays mutable — only pointing the name at something else is forbidden:
+`const` applies to the *name*, not to the value. An array or record in a const variable stays mutable. Only the reassignment of the name is not allowed:
 
 ```nio
 int[] const nums = [1, 2, 3];
@@ -445,7 +452,7 @@ myCar.age++;                   // fine: writes a field
 
 ## Optionals: `T?`
 
-A plain `T` can never hold `null`. When a value may be absent, declare it as `T?`:
+A plain `T` cannot hold `null`. A value that can be absent has the type `T?`:
 
 ```nio
 String? owner;                 // starts as null
@@ -454,11 +461,11 @@ owner = null;
 bool known = owner != null;
 ```
 
-Optionals only support `==` and `!=` — against `null`, against a plain `T`, or against another `T?`. The value itself comes out in one of two ways: narrowing, or optional chaining.
+Optionals support only `==` and `!=`, against `null`, a plain `T` or another `T?`. Narrowing and optional chaining give access to the value.
 
 ### Narrowing
 
-Where the compiler can see an optional is not null, you use it as a plain `T` — no unwrapping syntax:
+Where the compiler can prove that an optional is not null, the optional is usable as a plain `T`. No unwrap syntax is necessary:
 
 ```nio
 String? owner;
@@ -477,7 +484,13 @@ if (n != null && n > 3) {      // the right side of && already knows n
 }
 ```
 
-Narrowing follows the flow of your program. It covers the branch a null check proves safe (`if`, `while`, the right side of `&&`/`||`), continues after an `if` whose other branch always returns, and starts whenever a value that cannot be null is assigned. It stops as soon as the certainty does: assigning `null` (or another optional) un-narrows, and a loop that reassigns the variable keeps it optional throughout. The classic walk over a linked structure just works:
+Narrowing follows the control flow of the program. It applies:
+
+* in a branch that a null check makes safe (`if`, `while`, the right side of `&&` and `||`),
+* after an `if` whose other branch always returns,
+* after an assignment of a value that cannot be null.
+
+Narrowing stops when the compiler can no longer prove that the value is not null. An assignment of `null`, or of another optional, removes the narrowing. A loop that reassigns the variable keeps it optional in the full loop. A walk over a linked structure compiles as written:
 
 ```nio
 type Node { int value; Node? next; }
@@ -490,11 +503,11 @@ while (cur != null) {
 }
 ```
 
-Because a record field can be reached through other references, a narrowed *field* can in principle be set back to null behind your back (by an alias, or by a function you call) between the check and the use. If that happens, reading it is a clean runtime error — never memory corruption.
+Other references can also reach a record field. As a result, another reference, or a called function, can set a narrowed *field* back to null between the check and the use. If this occurs, the read is a runtime error. It never corrupts memory.
 
 ### Optional chaining: `?.`
 
-When you only want to reach through an optional, `?.` keeps the chain short: `a?.b` is `null` if `a` is null, and `b`'s value otherwise. The result is again an optional, and everything after the `?.` — plain fields, indexing, `.length` — rides along, short-circuiting to `null` at the first absent link:
+`?.` reaches through an optional. `a?.b` is `null` if `a` is null, and the value of `b` if not. The result is an optional. The operations after `?.` (fields, indexing, `.length`) are also part of the chain, and the chain gives `null` at the first absent link:
 
 ```nio
 type Team { String name; String[] members; }
@@ -505,11 +518,11 @@ print(c.boss?.name);         // null
 print(c.boss?.members[0]);   // null — the whole chain stops at boss
 ```
 
-A chain never produces `T??` — a field that is already optional passes through unchanged. Chains are read-only: `a?.b = v` is a compile error, and you cannot call a function through `?.`.
+A chain never gives `T??`. A field that is already optional stays `T?`. Chains are read-only: `a?.b = v` is a compile error, and `?.` cannot call a function.
 
 ## Record types
 
-A record is a type you declare yourself, with named fields. Two record types are always different types, even when their fields are identical. Records are declared at the top level of a file:
+A record is a user-declared type with named fields. Two record types are always different types, also when their fields are identical. Records are declared at the top level of a file:
 
 ```nio
 type Car {
@@ -527,11 +540,11 @@ myCar.owner = "bob";
 print(myCar.age);            // 4
 ```
 
-The type's name must start with an upper-case letter — `type Car`, not `type car`. That holds for every user-declared type, records and enums alike, and the compiler rejects a lower-case one with the capitalized name it expected. Built-in types (`int`, `bool`, …) are the only lower-case names in a type position; `String`, `DateTime` and `Duration` are the ones that are not.
+The name of the type must start with an upper-case letter: `type Car`, not `type car`. This rule applies to all user-declared types, records and enums. For a lower-case name, the compiler gives an error that shows the expected capitalized name. Only built-in types (`int`, `bool`, …) have lower-case names in a type position. `String`, `DateTime` and `Duration` are built-in types that start with an upper-case letter.
 
-A field is written type first, then name — the same order as a variable declaration (`int age;`) or a parameter (`f(int age)`). One rule covers every binding in the language.
+A field is written as type first, then name. This is the same order as in a variable declaration (`int age;`) or a parameter (`f(int age)`).
 
-Field names may be keywords. A field name only appears where one is already expected — after the field's type, before `:` in a literal, and after `.` — so nothing is ambiguous, and JSON keys like `"type"` stay modelable:
+Field names can be keywords. A field name occurs only where a field name is expected: after the type of the field, before `:` in a literal, and after `.`. As a result, JSON keys such as `"type"` can be field names:
 
 ```nio
 type Item { String type; int for; }
@@ -539,13 +552,13 @@ Item i = { type: "invoice", for: 3 }
 print(i.type);               // invoice
 ```
 
-Every non-optional field must be present in a literal. Record values are references — assigning or passing a record does not copy it.
+A literal must contain every non-optional field. Record values are references: an assignment or a call does not copy the record.
 
-The `;` between fields is required, but the one after the last field may be omitted.
+A `;` is required between fields. The `;` after the last field is optional.
 
 ### Methods
 
-A type's body can also declare functions. They are called on a value of the type and reach it through `self`:
+The body of a type can also declare functions, called methods. A method is called on a value of the type. The method accesses the value through `self`:
 
 ```nio
 type Car {
@@ -567,18 +580,18 @@ myCar.rename("honda");
 print(myCar.make);                     // honda
 ```
 
-A method is written exactly like a function: return type first (omitted when it returns nothing), `async` before the name for an async one, and no `;` needed after the body.
+A method is written the same as a function: the return type first (`void` when it returns nothing), `async` before the name for an async method, and no `;` after the body.
 
-`self` is the value the method was called on, and only exists inside a method body. Fields are always reached through it — there is no implicit field scope, so `make` on its own is undefined where `self.make` is the field. Since records are references, assigning to `self.make` changes the very value the caller holds.
+`self` is the value that the method was called on. It exists only inside a method body. A method always accesses fields through `self`. There is no implicit field scope. `make` alone is undefined, and `self.make` is the field. Records are references. An assignment to `self.make` changes the value that the caller holds.
 
-Methods belong to the **type**, not to each value. Nothing is stored per value, and which body runs is decided at compile time from the receiver's type — so a method costs a `Car` nothing, and stays out of `json.toText`:
+Methods belong to the **type**, not to each value. A value stores nothing for its methods, and the compiler selects the method body from the type of the receiver. As a result, methods do not make a `Car` larger, and they do not appear in the output of `json.toText`:
 
 ```nio
 import 'json';
 print(json.toText(myCar));             // {"make":"honda","buildYear":1922}
 ```
 
-Method names live in the record's own namespace: they can repeat function names or even built-in ones (`item.print()` is fine), but not a field name of the same type. Methods may call each other and themselves in any order, and whether one can fail is inferred from its body, exactly as for functions:
+Method names are in the namespace of the record. A method can have the same name as a function or a built-in function (`item.print()` is valid), but not the same name as a field of the same type. Methods can call each other and themselves in any order. The compiler infers from the body whether a method can fail, the same as for functions:
 
 ```nio
 type Box {
@@ -597,17 +610,17 @@ type Box {
 }
 ```
 
-Like a declared function, a method is not a value: `f = myCar.age;` and `myCar.age = ...;` are compile errors. Wrap it in a function value to get one — the wrapper remembers which value to call it on:
+A method is not a value, the same as a declared function: `f = myCar.age;` and `myCar.age = ...;` are compile errors. A function value that wraps the call can take its place. The wrapper keeps the value that it calls the method on:
 
 ```nio
 Function(int)<int> f = int (int now) -> myCar.age(now);
 ```
 
-A function-typed *field* is still a different thing, and the right one when the behavior differs from value to value rather than from type to type. See [Function values](/docs/functions).
+A function-typed *field* is different. It is for behavior that changes from value to value, not from type to type. [Function values](/docs/functions) gives the details.
 
 ### Extending a type
 
-`extends` gives a type a copy of another type's members, and lets it add to them:
+`extends` gives a type a copy of the members of another type. The new type can add members:
 
 ```nio
 type Car {
@@ -634,15 +647,15 @@ t.describe();                                  // volvo on 6 wheels
 print(t.make, t.load, t.carry(100));           // volvo 900 1000
 ```
 
-`Truck` has the base's fields first and its own after them, and every method `Car` has. Optional fields, JSON renames, and inferred fallibility all come along — what is copied is the declaration itself.
+`Truck` has the fields of the base first, then its own fields. It also has all methods of `Car`. Optional fields, JSON renames and inferred fallibility are also copied, because the copy is of the full declaration.
 
-A copied method belongs to the extending type: its body is checked and compiled again with `self` typed as `Truck`. That is why `describe`, written in `Car`, says 6 wheels for a truck — `self.wheels()` finds the override.
+A copied method belongs to the extending type. The compiler checks and compiles its body again, with `self` of type `Truck`. As a result, `describe`, written in `Car`, prints 6 wheels for a truck: `self.wheels()` calls the override.
 
-Replacing a method takes the `override` modifier, which goes where `async` goes. It is required (a silent replacement is a compile error), it is rejected when there is nothing to replace, and the replacement must keep the same signature. Fields cannot be overridden at all: redeclaring an inherited field name is an error.
+The `override` modifier replaces a method. It goes in the same position as `async`. It is required: a replacement without `override` is a compile error. `override` is an error when there is no method to replace. The replacement must have the same signature. Fields cannot be overridden: a redeclaration of an inherited field name is an error.
 
-Extending **copies members; on its own it does not relate the two types**. A `Truck` is not a `Car`, and cannot be passed or assigned where one is expected; `getType(t)` is `"Truck"`, and its JSON is its own. Chains work as expected — `type Van extends Truck` copies from `Truck` and, through it, from `Car`. Marking the base `sealed` is what relates them; see [Sealed types](#sealed-types) below.
+**`extends` copies members. It does not relate the two types.** A `Truck` is not a `Car`, and it cannot be passed or assigned where a `Car` is expected. `getType(t)` is `"Truck"`, and its JSON is its own. Chains work: `type Van extends Truck` copies from `Truck`, and through it from `Car`. A `sealed` base relates the types. [Sealed types](#sealed-types) gives the details.
 
-The base may come from another file, and can be anything that file `export`s:
+The base can come from another file, if that file `export`s it:
 
 ```nio
 // shapes.nio
@@ -667,13 +680,13 @@ Square s = { name: "sq", side: 4 };
 print(s.show());                                  // <sq>
 ```
 
-A copied body keeps resolving its names where it was written, so `show` still reaches `shapes.nio`'s private `label` and its `json` import — things `main.nio` cannot even name. The one thing that changes is `self`.
+A copied body resolves its names in the file where it was written. As a result, `show` can still call the private `label` of `shapes.nio` and use its `json` import, which `main.nio` cannot access. Only `self` changes.
 
-That last point has a consequence worth knowing: a base method that uses *its own type* where the receiver goes — `Car me() { return self; }` — cannot be inherited, because `self` is a `Truck` there. The compiler reports it against the type that inherited the body and names the file and line the body came from.
+A base method that uses *its own type* in the position of the receiver, for example `Car me() { return self; }`, cannot be inherited, because `self` is a `Truck` there. The compiler reports this error on the type that inherits the body, and gives the file and line of the body.
 
 ### Sealed types
 
-A `sealed` type may be extended only inside the module that declares it. Because the compiler then knows every type that extends it, two things become possible that plain `extends` cannot offer: a value of an extending type is usable where the sealed type is expected, and a `switch` over it can be checked to cover every case.
+A `sealed` type can be extended only in the module that declares it. As a result, all the types that extend it are known at compile time. This gives two things that plain `extends` does not give. A value of an extending type is usable where the sealed type is expected. The compiler can also check that a `switch` covers all cases.
 
 ```nio
 sealed type Expr { int line; }
@@ -687,9 +700,9 @@ Expr   e   = two;                          // an IntLit is usable as an Expr
 Expr[] all = [two, { line: 1, name: "x" }];
 ```
 
-This is what lets one array hold a whole tree, which is the shape a parser, an interpreter or a document model wants. `sealed` goes right before `type`, after `export` when both appear: `export sealed type Expr { … }`.
+As a result, one array can hold a tree of different node types, for example in a parser, an interpreter or a document model. `sealed` goes directly before `type`, and after `export` when both are present: `export sealed type Expr { … }`.
 
-To get back to a specific type, match on it. A `switch` over a sealed value takes types as labels and binds the value at the matched type:
+A match on the type gets a specific type back. A `switch` over a sealed value takes types as labels, and binds the value as the matched type:
 
 ```nio
 String render(Expr e) {
@@ -704,20 +717,24 @@ String render(Expr e) {
 }
 ```
 
-**With no `default`, the clauses must cover every extending type** — and that is the point of the whole feature. Add `type Unary extends Expr` later and this stops compiling, with a message naming `Unary`, instead of quietly falling through a case nobody updated. Writing a `default` opts out, for a switch that only cares about a few of the types.
+**With no `default`, the clauses must cover all extending types.** If a later change adds `type Unary extends Expr`, this switch does not compile, and the error message names `Unary`. A `default` clause removes this check, for a switch that handles only some of the types.
 
-Notice `render` needs no `return` after the switch: the set is closed and every member is named, so one clause always runs.
+`render` needs no `return` after the switch. The set of types is closed and each type has a clause. As a result, one clause always runs.
 
-For a one-off test, `as` narrows and yields an optional:
+For a single test, `as` narrows and returns an optional:
 
 ```nio
 IntLit? lit = e as IntLit;
 if (lit != null) { print(lit.value); }
 ```
 
-It yields `null` rather than raising because there is only one way it can fail — the value is not an `IntLit` — and nothing to report about it.
+If the value is not an `IntLit`, `as` returns `null`. It does not raise an error.
 
-Three limits are worth knowing. A type extending a sealed one **cannot itself be extended**: the hierarchy is one level deep. A **sealed type cannot be constructed** — `Expr e = { line: 1 };` is an error, because such a value would be no case of any switch over the extenders, and the guarantee that an exhaustive switch always runs a clause would be false. Write a type extending it that adds no fields when a "plain" one is what you want; it costs a line and every switch is then asked about it. (Fields are unaffected: a sealed type declares them, every extending type gets them, and a field or array element *typed* as the sealed type is how a recursive tree is written.) And a **method cannot be called on a value whose type is the sealed one** — a method is chosen by the type written down, so calling `describe()` on an `Expr` could not know which body to run. Narrow first, and the receiver's type is certain:
+Sealed types have three limits:
+
+* A type that extends a sealed type **cannot be extended**. The hierarchy is one level deep.
+* A **sealed type cannot be constructed**. `Expr e = { line: 1 };` is an error, because no clause of a switch over the extending types could match that value. For a "plain" value, a program declares an extending type that adds no fields. Each exhaustive switch must then handle that type too. Fields are not affected: a sealed type declares fields, each extending type gets them, and a field or array element *typed* as the sealed type is how a program writes a recursive tree.
+* A method **cannot be called on a value whose type is the sealed type**. The compiler selects the method from the declared type. It cannot select a body for `describe()` on an `Expr`. After narrowing, the type of the receiver is known:
 
 ```nio
 Shape s = square;
@@ -728,11 +745,11 @@ switch (s) {
 }
 ```
 
-Sealing costs the ability to extend the type from another module: the set has to be closed to be known, and a module cannot see who imports it. An exported sealed type can still be used and switched on by importers — just not extended.
+A sealed type cannot be extended from another module. Importers can use an exported sealed type and switch on it, but they cannot extend it.
 
 ### Union types
 
-A record says "this **and** that". A `union` says "this **or** that" — a value that is exactly one of a fixed set of types, each named by a tag:
+A record holds all of its fields. A `union` holds one value from a fixed set of types. Each type in the set is a member, and each member has a name, called its tag:
 
 ```nio
 union Text {
@@ -741,16 +758,16 @@ union Text {
 }
 ```
 
-Members are written type first then tag, like fields and parameters. A member whose type is a single capitalized name takes its tag from the type — `String` above is `Text.String` and needs no tag written. Anything else (`byte[]`, `int`, a function type) has no name to borrow and must be tagged.
+A member is written as type first, then tag, the same as a field or a parameter. If the member type is a single capitalized name, the tag is the type name: `String` above is `Text.String`, and needs no tag. All other member types (`byte[]`, `int`, a function type) must have a tag.
 
-A value goes in on its own, whenever exactly one member can hold it:
+A value converts to the union automatically when exactly one member can hold it:
 
 ```nio
 Text a = "hi";
 Text b = string.toByteArray("raw");
 ```
 
-and comes out by matching, with the clause binding what the member holds:
+To get the value out, match on the member. The clause binds the value that the member holds:
 
 ```nio
 String render(Text t) {
@@ -761,14 +778,14 @@ String render(Text t) {
 }
 ```
 
-With no `default`, the clauses must cover every member — so adding one later is a compile error at every switch that does not handle it, which is the whole reason to reach for a union rather than a record with one optional field per case. For a single member, `as` is the one-off, and answers what the member holds:
+With no `default`, the clauses must cover all members. If a later change adds a member, each switch that does not handle it is a compile error. A record with one optional field for each case does not give this check. For a single member, `as` returns the value that the member holds:
 
 ```nio
 String? s = t as Text.String;
 if (s != null) { print(s); }
 ```
 
-**Two members may share a type**, and then the tag is what tells them apart. The compiler cannot guess which is meant, so those are constructed by name:
+**Two members can have the same type.** Then only the tag identifies the member. The compiler cannot select a member for such a value. The value is constructed by name:
 
 ```nio
 union Distance { float Meters, float Feet }
@@ -777,11 +794,11 @@ union Distance { float Meters, float Feet }
 Distance d = Distance.Meters(3.0);
 ```
 
-`Union.Tag(value)` always works, whether or not it is required.
+`Union.Tag(value)` works for all members, also where it is not required.
 
-Like a record, a union is its own type — two unions with identical members are still different types — and it can be exported, nested in fields and arrays, and made optional with `Text?`. That optional is the only way to express absence: a *member* may not be optional, so a `Text?` has exactly one way to be nothing. Members also cannot be unions themselves, and a union neither extends a type nor is extended.
+A union is its own type, like a record: two unions with identical members are different types. A union can be exported, used in fields and arrays, and made optional with `Text?`. A member cannot be optional. `Text?` is the only way to show absence. A member cannot be a union. A union cannot extend a type, and no type can extend a union.
 
-An imported union's member takes all three names — `alias.Union.Tag` — which is the only place in the language a name has three parts:
+A member of an imported union has a name with three parts, `alias.Union.Tag`:
 
 ```nio
 import './text' as tx;
@@ -792,13 +809,13 @@ switch (t) {
 }
 ```
 
-A union also has a JSON form: it serializes as the member's payload, bare, and `json.parse … as T` picks the member from the JSON kind of the value — which is exactly what a document field that is sometimes a string and sometimes a number calls for. The [JSON page](/docs/stdlib/json#union-fields-one-key-several-shapes) has the rules and an example.
+A union also has a JSON form. It serializes as the payload of the member, with no wrapper. `json.parse … as T` selects the member from the JSON kind of the value. This handles a document field that is sometimes a string and sometimes a number. The [JSON page](/docs/stdlib/json#union-fields) has the rules and an example.
 
-Underneath, a union *is* a sealed type: the compiler writes the sealed type and one type extending it per member for you. That is why every member must be handled, why matching is fast, and why only the file that declares a union can add a member.
+Only the file that declares a union can add a member to it.
 
 ### Renaming a field in JSON
 
-By default a field's JSON key is its name. A string literal after the name gives it a different one, so a field can follow Nio's naming style while still matching what an external API sends:
+By default, the JSON key of a field is its name. A string literal after the field name sets a different key. As a result, a field can use the Nio naming style and still match the keys that an external API sends:
 
 ```nio
 import 'json';
@@ -812,13 +829,13 @@ Engine e = { liters: 12.8, power: 550 };
 print(json.toText(e));    // {"liters":12.8,"engine_power":550}
 ```
 
-The annotation changes only the serialized key — `e.power` is how you read the field in Nio, everywhere. No keyword introduces it: a string literal is the only thing that may follow a field name, so its position is enough to identify it.
+The annotation changes only the serialized key. Nio code always reads the field as `e.power`. No keyword is necessary: a string literal after a field name is always a rename annotation.
 
-The string is `target:key`. `json` is the only target for now; the prefix is there so another format can be added without changing the syntax. The compiler rejects an unknown target, an empty key, a rename of a field to its own name, and two fields in one type that would claim the same JSON key.
+The string has the form `target:key`. At present, `json` is the only target. The compiler rejects an unknown target, an empty key, a rename of a field to its own name, and two fields in one type with the same JSON key.
 
 ### Nested and anonymous types
 
-A field's type can be another record type — by name, or declared inline without a name. An inline (anonymous) type can take `[]` and `?` suffixes like any other type:
+The type of a field can be another record type, by name or declared inline without a name. An inline (anonymous) type can take the `[]` and `?` suffixes, like any other type:
 
 ```nio
 import 'time';
@@ -846,11 +863,11 @@ Car myCar = {
 myCar.repairs = [{ date: time.now(), amount: 250 }];
 ```
 
-Anonymous types are only allowed as field types inside a `type` declaration. Error messages name them by their path (`Car.repairs`).
+Anonymous types are allowed only as field types inside a `type` declaration. Error messages name them by their path (`Car.repairs`).
 
 ## Enum types
 
-An enum declares a fixed set of named integer constants as a type of its own. Every member carries an explicit value, and members are named through the type:
+An enum declares a fixed set of named integer constants as a separate type. Each member has an explicit value. Code names a member through the type:
 
 ```nio
 enum HttpResponses {
@@ -863,11 +880,11 @@ print(r);                      // OK — printing shows the member's name
 int code = r;                  // 200 — an enum value widens to int
 ```
 
-Like a record, an enum's name must start with an upper-case letter.
+The name of an enum must start with an upper-case letter, the same as the name of a record.
 
-An enum is a type of its own: an `int` cannot be assigned to one (`HttpResponses r = 200;` is a compile error), and two different enum types never mix. The protection runs one way — reading the numeric value out is just an assignment to an `int`.
+An enum is a separate type. An `int` cannot be assigned to an enum (`HttpResponses r = 200;` is a compile error), and two different enum types do not mix. The other direction is allowed: an assignment of the enum value to an `int` gives the numeric value.
 
-Enum values compare with `==`, `!=`, `<`, `<=`, `>`, `>=` — against the same enum, or against ints:
+Enum values compare with `==`, `!=`, `<`, `<=`, `>` and `>=`, against the same enum or against ints:
 
 ```nio
 if (r == HttpResponses.NOT_FOUND) {
@@ -876,15 +893,15 @@ if (r == HttpResponses.NOT_FOUND) {
 bool ok = r < 400;             // compares as 200
 ```
 
-Arithmetic is not defined on enums; widen to `int` first. Enums work anywhere a scalar does — optionals (`HttpResponses?`), arrays, record fields, function parameters and returns — and `json.toText` serializes the numeric value (`404`), not the name.
+Enums have no arithmetic. Arithmetic needs the value in an `int` first. An enum is usable in all positions where a scalar is allowed: optionals (`HttpResponses?`), arrays, record fields, function parameters and return values. `json.toText` writes the numeric value (`404`), not the name.
 
-Declared without an initializer, an enum variable starts at the numeric value `0`: the member with value 0 if the enum has one, otherwise a value outside the members that prints as its number.
+An enum variable without an initializer starts at the numeric value `0`. This is the member with the value 0, if the enum has one. If not, the value is not a member, and it prints as its number.
 
-An enum can be exported like any type: `export enum Status { ... }`, then `m.Status` in type positions and `m.Status.OK` in expressions (see [Modules](/docs/modules)).
+An enum can be exported like any type: `export enum Status { ... }`. Importers then write `m.Status` in type positions and `m.Status.OK` in expressions (see [Modules](/docs/modules)).
 
 ## Functions
 
-Functions are declared at the top level. The return type comes first, just like in a variable declaration, and is required: a function that returns nothing writes `void`. There is no `function` keyword:
+Functions are declared at the top level. The return type comes first, as in a variable declaration, and it is required. A function that returns nothing has the return type `void`. There is no `function` keyword:
 
 ```nio
 int add(int a, int b) {
@@ -896,11 +913,11 @@ void log(String msg) {
 }
 ```
 
-You can call a function from code above its declaration, and a function may call itself.
+Code above a function declaration can call the function, and a function can call itself.
 
 ### Variadic parameters
 
-Put `...` in front of the **last** parameter's type and it collects however many arguments the caller passes after the fixed ones:
+`...` before the type of the **last** parameter makes it variadic. That parameter then collects all the arguments that the caller passes after the fixed ones:
 
 ```nio
 void customPrint(int myInt, ...String logs) {
@@ -914,17 +931,17 @@ customPrint(0, "hello", "world", "!");
 customPrint(7);                          // logs is empty
 ```
 
-Inside the body it is just an array of the type you wrote — `...String logs` gives you a `String[]`, with `.length`, indexing and `forEach`. Passing no trailing arguments gives an empty array, never null.
+In the body, the parameter is an array of the declared type. `...String logs` gives a `String[]`, with `.length`, indexing and `forEach`. With no trailing arguments, the array is empty. It is never null.
 
-Only the last parameter can be variadic. Each collected argument is type-checked on its own, so `customPrint(0, "a", 1)` is an error. There is no spread: you cannot hand an existing `String[]` over as the arguments — if that is what your callers have, take a `String[]` parameter instead.
+Only the last parameter can be variadic. The compiler checks each collected argument separately. As a result, `customPrint(0, "a", 1)` is an error. There is no spread operator: an existing `String[]` cannot be passed as the arguments. For callers that have an array, a `String[]` parameter is the correct choice.
 
-Functions are also values: they can be created without a name, stored in variables, and passed around, and they remember the variables around them. See [Function values](/docs/functions).
+Functions are also values. Function values can be created without a name, stored in variables and passed as arguments. They capture the variables around them. [Function values](/docs/functions) gives the details.
 
-A function declared with `async` (`int async sum(int a) { ... }`) defers its body: calling it returns a `Future<int>` to `await` later. See [Async and futures](/docs/async).
+A function declared with `async` (`int async sum(int a) { ... }`) defers its body: a call returns a `Future<int>`, and a later `await` gets the result. [Async and futures](/docs/async) gives the details.
 
 ## Control flow
 
-Conditions must be `bool`, are always parenthesized, and braces are always required:
+Conditions must be `bool` and are always in parentheses. Braces are always required:
 
 ```nio
 if (x > 10) {
@@ -944,9 +961,9 @@ for (int i = 0; i < 3; i++) {
 }
 ```
 
-The `for` header is `init; condition; post`. The init clause may declare a variable — visible only inside the loop — or assign to an existing one; init and post may each be left empty, but the condition is required.
+The `for` header is `init; condition; post`. The init clause can declare a variable, which is visible only inside the loop, or assign to an existing variable. Init and post can be empty. The condition is required.
 
-`break` leaves the innermost loop it is written in, and `continue` skips to that loop's next iteration. Both work in `while`, `for`, and `forEach`:
+`break` leaves the innermost loop that contains it. `continue` goes to the next iteration of that loop. Both work in `while`, `for` and `forEach`:
 
 ```nio
 forEach(scores, s) {
@@ -956,13 +973,20 @@ forEach(scores, s) {
 }
 ```
 
-`continue` always does the loop's own next step, so in a `for` loop it still runs the post clause — the counter advances and the loop cannot spin. `break` skips the post clause and resumes after the loop. There are no loop labels: to leave two nested loops, break the inner one and check for it in the outer. Writing `continue` outside a loop is a compile error, as is writing `break` outside both a loop and a `switch`; and a function value written inside a loop cannot break out of it — its body runs when it is called, not where it was written.
+`continue` always runs the next step of its loop. In a `for` loop it runs the post clause. The counter increases, and the loop does not repeat without end. `break` skips the post clause and continues after the loop. There are no loop labels. To leave two nested loops, a program breaks the inner loop and tests for this in the outer loop.
 
-One thing to watch: a `while` loop that can `break` no longer proves its condition false afterwards, so it stops narrowing an optional the way a plain loop does.
+These are compile errors:
+
+* `continue` outside a loop.
+* `break` outside a loop and outside a `switch`.
+
+A function value written inside a loop cannot break out of the loop, because its body runs when it is called, not where it is written.
+
+After a `while` loop that contains `break`, the compiler cannot prove that the condition is false. As a result, an optional in the condition is not narrowed after the loop, as it is after a loop without `break`.
 
 ### `switch`
 
-`switch` matches one value against a list of constants:
+`switch` compares one value with a list of constants:
 
 ```nio
 switch (statusCode) {
@@ -975,9 +999,9 @@ switch (statusCode) {
 }
 ```
 
-The subject is evaluated once, and each `case` label is compared against it with the rules of `==`, in order; the first match runs its clause. If nothing matches, `default` runs — and with no `default`, nothing does.
+The subject is evaluated once. The switch compares each `case` label with it by the rules of `==`, in order, and the first match runs its clause. If no label matches, `default` runs. With no `default`, no clause runs.
 
-**A clause never falls into the next one.** When its last statement finishes, the switch is over, so no `break` is needed to separate the clauses. `break` is still there when a clause wants to leave from the middle of itself:
+**A clause never continues into the next clause.** When its last statement finishes, the switch ends. No `break` is necessary between clauses. `break` leaves a clause before its end:
 
 ```nio
 switch (kind) {
@@ -989,7 +1013,7 @@ switch (kind) {
 }
 ```
 
-Several labels share one clause by stacking them — an empty clause body means "run whatever the next one runs":
+Stacked labels share one clause. A clause with an empty body runs the next clause:
 
 ```nio
 switch (day) {
@@ -1001,7 +1025,7 @@ switch (day) {
 }
 ```
 
-You can switch on anything `==` accepts: the number types, `String`, `bool`, `DateTime`, `Duration`, an enum, and optionals of those — plus a [sealed type](#sealed-types), whose clauses match the value's *type* rather than its value. So an enum subject takes its own members, and an optional subject takes `null` as a label like any other:
+A switch accepts all types that `==` accepts: the number types, `String`, `bool`, `DateTime`, `Duration`, enums, and optionals of these types. A switch also accepts a [sealed type](#sealed-types), whose clauses match the *type* of the value. An enum subject takes the members of its enum as labels, and an optional subject takes `null` as a label:
 
 ```nio
 switch (level) {
@@ -1024,9 +1048,14 @@ switch (found) {
 }
 ```
 
-A few rules keep a switch readable, each a compile error when broken: labels must be **constants** (a literal, a negated number, `null`, or an enum member — anything computed is what `if` / `else if` is for), the same label may not appear **twice**, `default` comes **last** and only once, and a label that could never equal the subject is rejected rather than left as a clause that silently never runs.
+The compiler enforces these rules for a switch:
 
-Each clause body is its own scope, so two clauses can declare the same name. A `break` inside a switch leaves the switch, not the loop around it; a `continue` inside one belongs to that loop, since a switch is a choice rather than an iteration:
+* Labels must be **constants**: a literal, a negative number, `null` or an enum member. A computed value needs `if` and `else if`.
+* A label cannot occur **twice**.
+* `default` must be **last**, and it can occur only once.
+* A label that can never equal the subject is an error.
+
+Each clause body is a separate scope. Two clauses can declare the same name. A `break` inside a switch leaves the switch, not the loop around it. A `continue` inside a switch applies to the loop around it:
 
 ```nio
 for (int i = 0; i < 5; i++) {
@@ -1042,4 +1071,4 @@ for (int i = 0; i < 5; i++) {
 }
 ```
 
-`i++;` and `i--;` add or subtract 1 from an `int`, `float`, or equally wide sized-number variable, array element, or record field — including a narrowed `int?`/`float?`, which stays narrowed afterwards. They are statements, usable anywhere, not expressions: `int x = i++;` does not parse.
+`i++;` and `i--;` add 1 to or subtract 1 from a variable, an array element or a record field. The type must be `int`, `float`, or a sized number type of the same width. This includes a narrowed `int?` or `float?`, which stays narrowed after the operation. They are statements, not expressions, and they are allowed anywhere a statement is allowed. `int x = i++;` does not parse.

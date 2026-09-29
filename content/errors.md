@@ -14,11 +14,11 @@ String lookupName(int id) {
 }
 ```
 
-`Error` is a built-in record with two fields, `message` and `code`. Nothing else about the function changes — there is no keyword on the declaration, no wrapper type on the return, and no marker at the places that call it.
+`Error` is a built-in record with two fields, `message` and `code`. No other part of the function changes. The declaration needs no keyword, the return type needs no wrapper, and the call sites need no marker.
 
 ## Which functions can fail is inferred
 
-The compiler works it out from the body. A function is *fallible* when it can `return Error(...)`, or when it calls something fallible without catching it. That travels up the call graph on its own, so the code in between never mentions errors:
+The compiler finds this from the body. A function is *fallible* when it can `return Error(...)`, or when it calls a fallible function and does not catch the error. This rule applies up the call chain. As a result, the functions in between contain no error-handling code:
 
 ```nio
 String greeting(int id) {
@@ -29,18 +29,16 @@ String page(int id) {
 }
 ```
 
-If `lookupName` fails, `greeting` returns that error to *its* caller immediately, and so does `page`. You do not write anything to make that happen — which is the point: the levels in between usually have nothing useful to say about a failure.
+If `lookupName` fails, `greeting` immediately returns that error to *its* caller, and `page` does the same. No code is necessary for this.
 
-This works because Nio compiles the whole program from source, so the compiler can see every body. It is what lets a signature stay quiet about failure while every call site is still compiled against the truth.
-
-Standard library calls count the same way. The library functions that can fail are the ones whose failures come from outside your program — a missing file, a closed connection, text that is not a number. For example:
+Standard library calls follow the same rule. The library functions that can fail are those whose failures come from outside the program, for example a missing file, a closed connection or text that is not a number. They include:
 
 * every [`fs`](/docs/stdlib/fs) function except `fs.exists`, and [`path.userData`](/docs/stdlib/path#pathuserdata);
 * the parsers: `string.toInt`, `string.toUint`, `string.toFloat`, [`json.parse`](/docs/stdlib/json#jsonparse), `regexp.create`, and the `crypto` decoders;
 * reading from `process.stdin`;
-* every [`net`](/docs/stdlib/net) function except `net.close`, and [`http`](/docs/stdlib/http), [`tls`](/docs/stdlib/tls) and [`x509`](/docs/stdlib/x509) calls that talk to the network or read what it sent.
+* every [`net`](/docs/stdlib/net) function except `net.close`, and the [`http`](/docs/stdlib/http), [`tls`](/docs/stdlib/tls) and [`x509`](/docs/stdlib/x509) calls that use the network or read data from it.
 
-Each page of the standard library says which of its functions can fail. A function that reads a file or parses a number without catching the error can fail for that reason alone. `process.child.run` is slightly different: it returns a *future* that can fail, so what can fail is the `await`, not the call.
+Each page of the standard library tells which of its functions can fail. A function that reads a file or parses a number, and does not catch the error, is fallible for that reason alone. `process.child.run` is different: it returns a *future* that can fail. As a result, the `await` can fail, but the call cannot.
 
 ```nio
 import 'fs';
@@ -53,18 +51,18 @@ String slurp(String p) {
 
 ## An uncaught error stops the program
 
-An error that reaches the top with nothing handling it prints its message and exits with code 1, exactly like an out-of-range index would:
+If no code catches an error, the program prints the message and exits with code 1. An out-of-range index has the same result:
 
 ```nio
 print(page(-1));
 // runtime error: negative id
 ```
 
-So error handling is opt-in at whatever depth you want it. A program that never writes `catch` behaves the way a program with no error handling always has, and adding one `catch` somewhere up the chain is the only change needed to recover.
+A program can handle errors at any level of the call chain. A program with no `catch` stops at the first error. A `catch` at a level above the failure recovers from the error. No other change is necessary.
 
 ## Catching: a default value
 
-The simplest form replaces the failure with a value. It is an ordinary expression, so it nests anywhere:
+The simplest form replaces the failure with a value. It is an expression. It can be used inside other expressions:
 
 ```nio
 String name = lookupName(id) catch "anonymous";
@@ -73,7 +71,7 @@ print((lookupName(id) catch "anonymous") + "!");
 
 ## Catching: a block
 
-The other form binds the error and runs a block on the failure path:
+The other form binds the error to a name and runs a block when the call fails:
 
 ```nio
 String describe(int id) {
@@ -85,13 +83,13 @@ String describe(int id) {
 }
 ```
 
-`e` is an ordinary `Error` value, visible only inside the block.
+`e` is an `Error` value. It is visible only inside the block.
 
-Notice that the block ends with `return`. That is required whenever the catch is bound to a variable: if the block simply ended, `name` would have no value, and Nio never invents one. `return`, `break`, or `continue` all work — anything that leaves the scope.
+The block in this example ends with `return`. When the result of the catch is assigned to a variable, the block must leave the scope. If the block ended without leaving the scope, `name` would have no value, and Nio does not supply a default value. The block can leave the scope with `return`, `break` or `continue`.
 
-There are two situations where the block may fall through instead.
+In two cases, the block can end without leaving the scope.
 
-**The variable is optional.** Then falling out of the block leaves it `null`, which is the whole reason to declare it that way:
+**The variable is optional.** If the block ends without leaving the scope, the variable is `null`:
 
 ```nio
 String? name = lookupName(id) catch e {
@@ -104,13 +102,13 @@ if (name != null) {
 }
 ```
 
-If you want that without a handler, the default form says it in one line:
+The default form gives the same result without a handler block:
 
 ```nio
 String? name = lookupName(id) catch null;
 ```
 
-**Nothing is bound.** A catch standing alone as a statement discards the value, so there is nothing to supply:
+**The value is not assigned.** A catch used as a statement discards the value. The block does not have to supply one:
 
 ```nio
 greeting(id) catch e { print("ignored: " + e.message); };
@@ -118,7 +116,7 @@ greeting(id) catch e { print("ignored: " + e.message); };
 
 ## Telling one failure from another
 
-A message is prose. It is written to be read, and for a library failure it comes from the platform's `strerror`, which varies by system and by locale — so matching on it is not something a program should do. That is what `code` is for:
+The `message` of a library error comes from the platform's `strerror`. Its text changes with the system and the locale. As a result, a comparison of messages does not reliably identify a failure. The `code` field identifies it:
 
 ```nio
 import 'fs';
@@ -134,15 +132,15 @@ byte[] load(String path) {
 }
 ```
 
-`Error("...")` leaves the code `0`, so nothing has to change in a program that does not care.
+`Error("...")` sets the code to `0`. The code argument is optional.
 
-The standard library's codes are the members of `ErrorCode`, reached through whichever module raised: `fs.ErrorCode`, `string.ErrorCode`, `process.ErrorCode`, `regexp.ErrorCode`, `net.ErrorCode`. All of them name the same enum, so a `NOT_FOUND` from one compares equal to a `NOT_FOUND` from another. The members are `NONE`, `OTHER`, `NOT_FOUND`, `PERMISSION`, `EXISTS`, `NOT_DIRECTORY`, `IS_DIRECTORY`, `NOT_EMPTY`, `INVALID`, `IO`, `NO_SPACE`, `TOO_MANY_FILES`, `NAME_TOO_LONG`, `INTERRUPTED`, `END_OF_FILE`, `LOOP`, `READ_ONLY`, and the network ones — `CONNECTION_REFUSED`, `CONNECTION_RESET`, `CONNECTION_ABORTED`, `NOT_CONNECTED`, `ALREADY_CONNECTED`, `ADDRESS_IN_USE`, `ADDRESS_NOT_AVAILABLE`, `NETWORK_UNREACHABLE`, `HOST_UNREACHABLE`, `BROKEN_PIPE`, `MESSAGE_TOO_LONG` and `TIMED_OUT` (see [Net](/docs/stdlib/net)). They are symbolic rather than raw `errno` numbers, which differ between platforms; an `errno` that is not one of these becomes `OTHER`.
+The codes of the standard library are the members of `ErrorCode`. A program reaches the enum through the module that raised the error: `fs.ErrorCode`, `string.ErrorCode`, `process.ErrorCode`, `regexp.ErrorCode`, `net.ErrorCode`. All of these names refer to the same enum. A `NOT_FOUND` from one module is equal to a `NOT_FOUND` from another. The members are `NONE`, `OTHER`, `NOT_FOUND`, `PERMISSION`, `EXISTS`, `NOT_DIRECTORY`, `IS_DIRECTORY`, `NOT_EMPTY`, `INVALID`, `IO`, `NO_SPACE`, `TOO_MANY_FILES`, `NAME_TOO_LONG`, `INTERRUPTED`, `END_OF_FILE`, `LOOP`, `READ_ONLY`, and these network codes: `CONNECTION_REFUSED`, `CONNECTION_RESET`, `CONNECTION_ABORTED`, `NOT_CONNECTED`, `ALREADY_CONNECTED`, `ADDRESS_IN_USE`, `ADDRESS_NOT_AVAILABLE`, `NETWORK_UNREACHABLE`, `HOST_UNREACHABLE`, `BROKEN_PIPE`, `MESSAGE_TOO_LONG` and `TIMED_OUT` (see [Net](/docs/stdlib/net)). The codes are symbolic names, not raw `errno` numbers, because `errno` numbers are different on each platform. An `errno` value that has no matching member becomes `OTHER`.
 
-The library modules written in Nio have codes of their own: [`http.ErrorCode`](/docs/stdlib/http) starts at 100, [`tls.ErrorCode`](/docs/stdlib/tls) at 200, and [`x509.ErrorCode`](/docs/stdlib/x509) at 300. The ranges never overlap, so one handler can compare a caught error against `net.ErrorCode` and `http.ErrorCode` both. Your own enums work the same way.
+The `http`, `tls` and `x509` modules have their own codes: [`http.ErrorCode`](/docs/stdlib/http) starts at 100, [`tls.ErrorCode`](/docs/stdlib/tls) at 200, and [`x509.ErrorCode`](/docs/stdlib/x509) at 300. The ranges do not overlap. As a result, one handler can compare a caught error against both `net.ErrorCode` and `http.ErrorCode`. Enums that a program declares work in the same way.
 
-## Your own codes
+## Custom error codes
 
-The field is a plain `int`, not any particular enum, so that the library and your program can each use their own codes. Declare an enum and pass a member:
+The `code` field is a plain `int`, not a specific enum. As a result, the library and a program can each use their own codes. A program declares an enum and passes a member:
 
 ```nio
 enum ParseErr { BAD_DIGIT: 1, OVERFLOW: 2 }
@@ -158,11 +156,11 @@ int n = parseCount(text) catch e {
 };
 ```
 
-An enum widens to `int` on the way in and compares against one on the way out, so this needs no rules of its own.
+An enum member converts to `int` when it is passed to `Error`. A program can compare `e.code` with an enum member directly.
 
-## Passing an error up yourself
+## Passing an error up explicitly
 
-`return e` inside a catch block hands the error to your own caller. The block runs *outside* the expression it guards, so an error raised in it propagates like any other — which is all a rethrow is here:
+`return e` inside a catch block passes the error to the caller of the function that contains the block. The block runs *outside* the expression that it guards. As a result, an error raised in the block propagates like any other error:
 
 ```nio
 String shout(int id) {
@@ -176,23 +174,23 @@ String shout(int id) {
 
 ## One catch covers the whole expression
 
-`catch` binds looser than every operator, so it handles an error from anywhere on its left. One handler covers both calls here:
+`catch` has a lower precedence than every operator. As a result, it handles an error from any part of the expression on its left. One handler covers both calls here:
 
 ```nio
 String s = first(x) + second(y) catch "fallback";
 ```
 
-Parenthesize to narrow it to part of the expression.
+Parentheses around a part of the expression limit the catch to that part.
 
-Catching something that cannot fail is a compile error, in the same spirit as `?.` on a non-optional — the handler would be dead code. That also means deleting the last `return Error(...)` from a function tells you exactly which callers no longer need to handle it.
+A `catch` on an expression that cannot fail is a compile error. As a result, when the last `return Error(...)` is removed from a function, the compiler shows each caller that no longer needs to handle the error.
 
 ## Errors are not bugs
 
-The [runtime errors](/docs/memory) that mark bugs — an index out of range, division by zero, a deadlock — are not catchable. `catch` handles the `Error` a function chose to return, not a mistake in the program. Keeping the two apart is deliberate: the first is a result your caller can act on, the second means the code is wrong.
+The [runtime errors](/docs/memory) that show bugs, for example an index out of range, a division by zero or a deadlock, cannot be caught. `catch` handles an `Error` that a function returns. It does not handle a mistake in the program.
 
-That line is also why [`fs`](/docs/stdlib/fs) raises `Error`s instead of stopping the program. A file that is not there is not a bug in the code that looked for it, so it is the caller's business what to do about it.
+For this reason, [`fs`](/docs/stdlib/fs) functions raise an `Error` and do not stop the program. A missing file is not a bug in the code that looked for it. The caller decides what to do.
 
-When one does stop the program, it prints where it happened — innermost call first:
+When a runtime error stops the program, the program prints where the error occurred, with the innermost call first:
 
 ```text
 runtime error: index 99 out of range (array length 3)
@@ -204,17 +202,17 @@ in:
   main
 ```
 
-A method reads as `Type.name`, and a function literal is named by the function it was written in, like `<function literal in outer>`.
+A method is shown as `Type.name`. A function literal is named after the function that contains it, for example `<function literal in outer>`.
 
-The list can have gaps. Recording it costs your program nothing, because it reuses information the garbage collector already keeps — but that means it can only name functions the collector tracks. Three kinds are missing: a function that works only with numbers, a standard-library function (you see the Nio function that called it instead), and an `async` function.
+The list can have gaps. The list has no run-time cost, because it uses information that the garbage collector already keeps. As a result, it shows only the functions that the collector tracks. Three kinds of function are not shown: a function that works only with numbers, a standard-library function (the list shows the Nio function that called it) and an `async` function.
 
-An uncaught `Error` prints the same way, but the list means something different. An error is passed up by returning, so by the time nothing is left to catch it, every function it passed through has already returned. The list therefore shows where the program stopped, not where the error came from. To tell which of several calls failed, give each a different `code`.
+An uncaught `Error` prints a list in the same format, but the list has a different meaning. An error goes up to the caller by a return. When no caller is left to catch the error, every function on its path has already returned. As a result, the list shows where the program stopped, not where the error came from. A different `code` for each call identifies which of several calls failed.
 
-Set `NIO_NO_TRACE=1` if a program needs to compare the error text exactly.
+`NIO_NO_TRACE=1` prints the message without the list. This is useful when a program must compare the error text exactly.
 
 ## Function values and futures
 
-Inference reads bodies, so the two types that describe a function *without* one have to say it. Both mark the result with `!`:
+A function type and a future type have no body from which the compiler can infer fallibility. A `!` after the result type shows that they can fail:
 
 ```nio
 Function(int)<String!> gen = String (int id) -> {
@@ -225,9 +223,9 @@ print(gen(1) catch "anonymous");   // Jack
 print(gen(0) catch "anonymous");   // anonymous
 ```
 
-A function value written where a fallible type is expected takes that contract on even when its own body cannot fail, since its callers are already compiled against it. One whose body *can* fail, written where a plain type is expected, is a compile error that names the type you meant.
+A function value written where a fallible type is expected is fallible, even when its body cannot fail. A function value whose body can fail, written where a non-fallible type is expected, is a compile error. The error message names the type to use.
 
-Async functions are inferred like any other. Calling one never fails — the body has not run yet — so the fallibility rides on the future and surfaces at the `await`:
+The compiler infers fallibility for async functions in the same way as for other functions. A call to an async function never fails, because the body has not run yet. The error goes into the future, and the `await` raises it:
 
 ```nio
 String async fetchName(int id) {
@@ -241,8 +239,8 @@ Future<String!> pending = fetchName(-1);
 print(await pending catch "offline");         // offline
 ```
 
-An error raised by a future nobody ever awaits is not lost: it stops the program when it runs out of work. For the same reason `async.run` does not take a fallible future — a completion callback has no error channel — so await it instead.
+An error raised by a future that is never awaited is not lost. When the program has no more work to do, the error stops the program. `async.run` does not accept a fallible future, because a callback cannot receive an error. A program awaits a fallible future instead.
 
 ## What is not here yet
 
-`Error` carries a message and a code, and nothing else. The code is enough to tell one failure from another, as the examples above do, but you cannot declare an error *type* of your own or attach more data; if you need more today, put it in the message.
+`Error` holds a message and a code, and nothing else. The code is sufficient to tell one failure from another, as the examples above show. A program cannot declare its own error *type* or attach more data. At present, the message is the only place for more data.

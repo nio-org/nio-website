@@ -1,16 +1,16 @@
 ---
 title: "Testing with nio test"
-description: "Write tests for Nio programs and run them with nio test: filter by name, read exit statuses, and write the entry file yourself."
+description: "Tests for Nio programs and nio test: filtering by name, exit statuses, and a hand-written entry file."
 ---
 
 # Testing
 
-A test is an ordinary program. The `test` module (see
-[Test](/docs/stdlib/test)) registers cases as a module initializes, so a test
-file is a module of `test.start` calls and a test *program* is an entry file
-that imports the modules it wants to run.
+A test is an ordinary program. The `test` module
+([Test](/docs/stdlib/test)) registers test cases when a module initializes. A
+test file is a module of `test.start` calls. A test *program* is an entry file
+that imports the test modules to run.
 
-`nio test` writes that entry file for you.
+`nio test` writes that entry file automatically.
 
 ```sh
 nio test                       # every *_test.nio under the working directory
@@ -19,40 +19,40 @@ nio test --filter parser       # only the tests whose title holds "parser"
 nio test --coverage tests/     # ...and write coverage.lcov on exit
 ```
 
-A directory means every `*_test.nio` at or under it, in a settled order, so
-two runs register the tests in the same sequence. `.git` and `node_modules`
-are skipped. The generated entry file is handed to the compiler as text and
-is never written into your tree.
+A directory argument means every `*_test.nio` file at or under it. The order
+is fixed. Two runs register the tests in the same sequence. `nio test`
+skips `.git` and `node_modules`. It gives the generated entry file to the
+compiler as text, and does not write it into the source tree.
 
 ## Filtering by name
 
-`--filter <text>` runs only the tests whose title holds that text — a
-substring, not a pattern, so nothing has to be escaped:
+`--filter <text>` runs only the tests whose title contains that text. The text
+is a substring, not a pattern. Characters in it need no escape:
 
 ```sh
 nio test --filter "parser: a union"
 nio test --filter=parser
 ```
 
-The filter belongs to the `test` module rather than to the command, so it
-works for a test program you wrote yourself as well:
+The filter is part of the `test` module, not of the command. As a result, it
+also works for a hand-written test program:
 
 ```sh
 nio run tests/all.nio --filter lexer
 ```
 
-A filtered run says how many it left out, so a filter that matches nothing
-is visible rather than silent:
+A filtered run shows how many tests it did not run. This shows when a filter
+matches no tests:
 
 ```text
 ok   lexer: positions
 36 passed, 0 failed, 250 filtered out
 ```
 
-One case does not save time: a test registered with `test.startAsync` has
-already been started by the caller before the module hands it over
-([Async and futures](/docs/async)), so a filter can only stop it being
-*reported*, not stop it running.
+A filter does not stop an async test from running. The caller starts a test
+registered with `test.startAsync` before the module receives it
+([Async and futures](/docs/async)). A filter can stop only the report of that
+test.
 
 ## Exit statuses
 
@@ -62,31 +62,29 @@ already been started by the caller before the module hands it over
 | `1` | at least one test failed |
 | `2` | the run could not happen: an unknown flag, no `*_test.nio` under the paths, or a program that does not build |
 
-0 and 1 come from the test program itself, which is why they are the same
-whether you run `nio test` or the program directly. 2 is `nio test`'s own,
-and it exists so that a continuous-integration job can tell "the tests say
-no" from "the tests never ran".
+The test program returns 0 and 1. These statuses are the same from `nio test`
+and from a direct run of the program. Only `nio test` returns 2. A
+continuous-integration job can use it to tell a failed test from a run that
+did not occur.
 
 ## One program, not one per file
 
-`nio test` builds a single program out of every test file it found. That is
-a deliberate trade: a test module is registered by being imported, so one
-program means one link for the whole suite instead of a link per file, and a
-link is the expensive part of a Nio build.
+`nio test` builds one program from all the test files that it finds. A test
+module registers its tests when it is imported. As a result, the suite needs
+one link instead of one link per file. The link is the slowest part of a Nio build.
 
-It also means the tests run one at a time. Nothing in a test program is
-async unless you make it so, and an `await` outside an async function drives
-the scheduler to completion, so cases do not interleave by accident. Running
-tests side by side would mean running *processes* side by side — which is
-worth doing only where the tests themselves cost more than the links would,
-and is not what this command does today.
+The tests run one at a time. Nothing in a test program is async unless its
+code declares it async. An `await` outside an async function runs the
+scheduler until the future completes. As a result, test cases do not
+interleave by accident. `nio test`
+does not run tests in parallel.
 
-## Writing the entry file yourself
+## A hand-written entry file
 
-You still can, and this repository does: `tests/all.nio` is a hand-written
-entry, and it earns that because it fixes the order of two suites and cleans
-up a shared temporary directory when the second finishes. A hand-written
-entry gets `--filter` for free, since that lives in the module.
+A project can also write the entry file by hand. For example, a hand-written entry can
+set the order of test suites, or remove a shared temporary directory after the
+last suite. `--filter` also works with a hand-written entry, because the
+`test` module reads it.
 
 ```nio
 // tests/all.nio

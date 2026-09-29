@@ -1,6 +1,6 @@
 ---
 title: "fs module: files and directories"
-description: "The Nio fs module creates, reads, writes, copies, renames, inspects and deletes files and directories, with errors you can catch."
+description: "The Nio fs module creates, reads, writes, copies, renames, inspects and deletes files and directories, with catchable errors."
 ---
 
 # FS
@@ -26,7 +26,7 @@ print(text);
 
 ## Notes
 
-File-system operations can fail for normal reasons: a file may be missing, permissions may be denied, or a disk may be full. Every function except `fs.exists` is therefore fallible and can be handled with [`catch`](/docs/errors).
+File-system operations can fail for normal reasons: a file may be missing, permissions may be denied, or a disk may be full. For this reason, each function except `fs.exists` is fallible. A [`catch`](/docs/errors) handles its errors.
 
 ```nio
 import 'fs';
@@ -51,12 +51,12 @@ The module exports two record types:
 | `name` | `String` | Final part of the path. |
 | `extension` | `String` | Final extension, including `.`, or `""`. |
 | `size` | `int` | Size in bytes. |
-| `isDirectory` | `bool` | Whether the entry is a directory. |
-| `isFile` | `bool` | Whether the entry is a regular file. |
+| `isDirectory` | `bool` | `true` when the entry is a directory. |
+| `isFile` | `bool` | `true` when the entry is a regular file. |
 | `permissions` | `String` | Permissions such as `"rw-r--r--"`. |
 | `modified` | `DateTime` | Last modification time. |
 
-`createDir` and `readDir` work on one directory at a time. Only `fs.delete(path, { recursive: true })` walks through a whole directory tree.
+`createDir` and `readDir` work on one directory at a time. Only `fs.delete(path, { recursive: true })` goes through all levels of a directory tree.
 
 ## `fs.copy()`
 
@@ -64,9 +64,9 @@ The module exports two record types:
 void fs.copy(String from, String to)
 ```
 
-Copies the file at `from` to `to`, creating `to` or replacing whatever was there. The content is streamed, so a large file costs no more memory than a small one. The source must be a file — copying a directory raises `IS_DIRECTORY`.
+Copies the file at `from` to `to`. If `to` does not exist, the function creates it. If an entry exists at `to`, the function replaces it. The content is streamed. The memory use does not increase with the file size. The source must be a file. A copy of a directory raises `IS_DIRECTORY`.
 
-Metadata (permissions, times) is not copied: the copy is a new file with the same bytes, exactly as `writeFile` would have made it.
+Metadata (permissions, times) is not copied. The copy is a new file with the same bytes, the same as a file that `writeFile` makes.
 
 ```nio
 import 'fs';
@@ -122,7 +122,7 @@ void fs.delete(String path)
 void fs.delete(String path, fs.DeleteOptions options)
 ```
 
-Deletes a file or an empty directory. Pass `{ recursive: true }` to delete a directory and everything inside it.
+Deletes a file or an empty directory. With `{ recursive: true }`, it deletes a directory and everything inside it.
 
 Recursive deletion may leave a partly deleted tree if an entry cannot be removed. A symbolic link is deleted without deleting its target.
 
@@ -144,9 +144,9 @@ if (fs.exists("build")) {
 bool fs.exists(String path)
 ```
 
-Returns whether an entry exists at `path`. This is the only function in the module that is not fallible.
+Returns `true` when an entry exists at `path`. It is the only function in the module that is not fallible.
 
-The result can become stale immediately; perform the operation and catch its error when another process may change the path.
+The result can become incorrect immediately after the call. When another process can change the path, the reliable check is the operation itself, with a `catch` for its error.
 
 ```nio
 import 'fs';
@@ -162,7 +162,7 @@ if (fs.exists("config.json")) {
 String[] fs.readDir(String path)
 ```
 
-Returns the names directly inside a directory. The names do not include the directory path, `.` or `..`; hidden entries are included. No ordering is guaranteed.
+Returns the names of the entries directly inside a directory. The names do not include the directory path. The result does not include `.` or `..`, but it includes hidden entries. The order of the names is not guaranteed.
 
 ```nio
 import 'fs';
@@ -180,7 +180,7 @@ forEach(names, name) {
 byte[] fs.readFile(String path)
 ```
 
-Reads the entire file into a new byte array held in memory. Convert the result with `string.fromByteArray` when the file contains text.
+Reads all of the file into a new byte array in memory and returns it. When the file contains text, `string.fromByteArray` converts the result to a string.
 
 ```nio
 import 'fs';
@@ -196,11 +196,11 @@ print(string.fromByteArray(content));
 void fs.rename(String from, String to)
 ```
 
-Moves the entry at `from` — file or directory — to `to`, replacing anything already there.
+Moves the file or directory at `from` to `to`. If an entry exists at `to`, the function replaces it.
 
-On POSIX platforms the replacement is atomic, which makes write-then-rename the way to save a file that can never be left half-written: write the new content to a temporary name, then rename it over the real file. A reader (or a crash) sees either the old file or the new one, never a mixture. On Windows the replacement is not atomic, but the final state is the same.
+On POSIX platforms, the replacement is atomic. A program can use this to save a file that is never partly written. It writes the new content to a temporary name. Then it renames the temporary file to the real name. A reader, or a crash, sees the old file or the new file, never a mix of the two. On Windows, the replacement is not atomic, but the final state is the same.
 
-Renaming moves a *name*; it does not copy bytes, so moving across file systems is whatever the operating system allows (usually a failure — use `fs.copy` then `fs.delete` there).
+A rename moves a name and does not copy bytes. A move to a different file system usually fails, but the result depends on the operating system. A move to a different file system is an `fs.copy` followed by an `fs.delete`.
 
 ```nio
 import 'fs';
@@ -217,7 +217,7 @@ fs.rename("state.json.tmp", "state.json");
 fs.Stat fs.stat(String path)
 ```
 
-Returns an [`fs.Stat`](#notes) record for the entry. Symbolic links are followed, so the result describes the target.
+Returns an [`fs.Stat`](#notes) record for the entry. Symbolic links are followed. The result describes the target.
 
 ```nio
 import 'fs';
@@ -238,9 +238,9 @@ if (info != null) {
 void fs.writeFile(String path, byte[] content)
 ```
 
-Writes all of `content` to a file. A missing file is created; an existing file is replaced. Parent directories are not created automatically.
+Writes all of `content` to a file. If the file does not exist, the function creates it. If the file exists, the function replaces it. The function does not create parent directories.
 
-An empty array creates an empty file. Use `string.toByteArray` to write text.
+An empty array creates an empty file. `string.toByteArray` converts text to the bytes that this function writes.
 
 ```nio
 import 'fs';

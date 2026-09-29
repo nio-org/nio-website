@@ -11,7 +11,7 @@ description: "The Nio http module runs HTTP/1.1 servers with routing and streami
 import 'http';
 ```
 
-The `http` module runs HTTP/1.1 servers and makes HTTP requests. The client can also make HTTPS requests. It is built on [`net`](/docs/stdlib/net) and [`tls`](/docs/stdlib/tls), and it is written in Nio itself.
+The `http` module runs HTTP/1.1 servers and makes HTTP requests. The client can also make HTTPS requests. The module uses [`net`](/docs/stdlib/net) and [`tls`](/docs/stdlib/tls).
 
 A small server with three routes:
 
@@ -37,34 +37,34 @@ The last line keeps the program running and serving requests until the server st
 
 ## Notes
 
-* **The client speaks HTTPS; the server does not.** A request to an `https://` URL is encrypted and the server's certificate is checked. The server only speaks plain HTTP, so to serve HTTPS, put it behind a proxy such as nginx or Caddy that handles the encryption — the usual way to deploy a web service anyway.
+* **The client supports HTTPS. The server does not.** A request to an `https://` URL is encrypted, and the client checks the server's certificate. The server supports only plain HTTP. To serve HTTPS, a program needs a proxy in front of the server that does the encryption, such as nginx or Caddy.
 * **Only HTTP/1.1.** There is no HTTP/2 and no WebSocket support.
-* **A server uses one CPU core.** Requests take turns at every `await`, as described in [Async and futures](/docs/async).
-* **Bodies can be streamed** in every direction, so a large upload, a download, or a never-ending event stream never has to be held in memory whole. See [`http.stream()`](#httpstream), [`ClientResponse`](#httpclientresponse) and [`Server.routeStream()`](#serverroutestream).
-* **Header names are case-insensitive**, so use `http.getHeader` and `http.setHeader` rather than indexing the map with a name you typed.
-* **The server has fixed limits**, so one bad client cannot exhaust it:
+* **A server uses one CPU core.** The server changes from one request to another at each `await`, as described in [Async and futures](/docs/async).
+* **Bodies can be streamed.** The server can read a request body and write a response body in pieces. The client can read a response body in pieces. As a result, a large upload, a download, or an event stream that does not end is not kept in memory at one time. [`http.stream()`](#httpstream), [`ClientResponse`](#httpclientresponse) and [`Server.routeStream()`](#serverroutestream) give the details.
+* **Header names are case-insensitive.** `http.getHeader` and `http.setHeader` ignore case. A direct index into the map uses the exact case of the name.
+* **The server has fixed limits.** This prevents a bad client from using all of the server's resources. The limits are:
 
 | Limit | Value |
 | --- | --- |
 | One line (the request line, the status line, or a header) | 8 KB |
-| The whole header block | 64 KB |
+| The full header block | 64 KB |
 | Number of headers | 100 |
 | Body the server reads before calling a handler | 10 MB, or `Options.maxBody` |
-| Body the client holds | no limit, unless you set `ClientOptions.maxBody` |
+| Body the client holds | no limit, unless `ClientOptions.maxBody` is set |
 
-A request that is too large gets a `413` answer, and a malformed one a `400`, before any of your code runs.
+The server returns `413` for a request that is too large and `400` for a malformed request. It does this before any handler code runs.
 
 Requests and parsing functions can fail. The error's `code` is one of these `http.ErrorCode` values:
 
 | Code | Meaning |
 | --- | --- |
 | `MALFORMED_REQUEST` | The request, URL or query could not be read. |
-| `MALFORMED_RESPONSE` | The server's answer could not be read. |
+| `MALFORMED_RESPONSE` | The server's response could not be read. |
 | `TOO_LARGE` | Something was larger than one of the limits above. |
 | `UNSUPPORTED_SCHEME` | The URL starts with neither `http://` nor `https://`. |
 | `TOO_MANY_REDIRECTS` | More than five redirects in a row. |
 
-A network failure underneath, such as a refused connection, keeps its [`net`](/docs/stdlib/net) error code, and a certificate problem on an HTTPS request keeps its [`tls`](/docs/stdlib/tls) or [`x509`](/docs/stdlib/x509) code. That way your program can tell "the certificate expired" from "nobody answered". The four sets of codes never overlap.
+A network failure, such as a refused connection, keeps its [`net`](/docs/stdlib/net) error code. A certificate problem on an HTTPS request keeps its [`tls`](/docs/stdlib/tls) or [`x509`](/docs/stdlib/x509) code. As a result, a program can use the code to tell a certificate error from a connection error. The four sets of codes do not overlap.
 
 ## `http.server()`
 
@@ -72,7 +72,7 @@ A network failure underneath, such as a refused connection, keeps its [`net`](/d
 http.Server http.server()
 ```
 
-Creates a server with no routes. A server is an ordinary value, so one program can run several — for example a public port and an admin port.
+Creates a server with no routes. A server is an ordinary value. One program can run more than one server. For example, one server can listen on a public port and another on an admin port.
 
 ## `Server.route()`
 
@@ -80,17 +80,17 @@ Creates a server with no routes. A server is an ordinary value, so one program c
 void s.route(http.Method m, http.Pattern p, http.ResponseFunction handler)
 ```
 
-Adds a route: requests with method `m` whose path matches `p` are answered by `handler`. The methods are `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD` and `OPTIONS`.
+Adds a route. `handler` handles each request that has method `m` and a path that matches `p`. The methods are `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD` and `OPTIONS`.
 
 A pattern is a path split on `/`, and each part is one of these:
 
 | Part | Matches |
 | --- | --- |
-| `users` | exactly that text |
+| `users` | that text only |
 | `:id` | any single part, which the handler reads as `req.params["id"]` |
 | `*` | this part and everything after it |
 
-**The first matching route wins**, so register a catch-all such as `*` last. A request that matches no route gets `404 not found`.
+**The first matching route wins.** A catch-all such as `*` hides every route that is registered after it. The server returns `404 not found` for a request that matches no route.
 
 A handler is a function that takes an `http.Request` and returns an `http.Response`:
 
@@ -101,7 +101,7 @@ http.Server s = http.server();
 s.route(http.Method.GET, "/", http.Response (http.Request r) -> http.text(200, "hello"));
 ```
 
-A handler that needs to wait for something — a database, another HTTP service — is an `async` function instead, and returns a future of a response:
+A handler that must wait for an operation, for example a database query or a request to another HTTP service, is an `async` function. It returns a future of a response:
 
 ```nio
 import 'http';
@@ -117,12 +117,12 @@ http.Server s = http.server();
 s.route(http.Method.GET, "/proxy", Future<http.Response> (http.Request r) -> proxy(r));
 ```
 
-You can mix both kinds of handler in one server; `route` accepts either.
+One server can have both kinds of handler. `route` accepts either kind.
 
-* If an ordinary handler fails with an error, the server answers `500` without sending the error's details to the client.
-* An `async` handler cannot fail: catch errors inside it and choose the status to answer with yourself, as `proxy` does above.
+* If an ordinary handler fails with an error, the server returns `500`. It does not send the error's details to the client.
+* An `async` handler cannot fail. It must catch its errors and select the response status itself, as `proxy` does above.
 
-Instead of a text pattern, you can pass a compiled [`RegExp`](/docs/stdlib/regexp), which must match the whole path. Text patterns are faster, so use a regular expression only when you need one. A regular expression route sets no `req.params`.
+A pattern can also be a compiled [`RegExp`](/docs/stdlib/regexp) instead of text. It must match the full path. Text patterns are faster than regular expressions. A regular expression route sets no `req.params`.
 
 ```nio
 import 'http';
@@ -139,7 +139,7 @@ s.route(http.Method.GET, digits, http.Response (http.Request r) -> http.text(200
 void s.routeStream(http.Method m, http.Pattern p, http.ResponseFunction handler)
 ```
 
-Like `route`, except that the server does **not** read the request body before calling the handler. The handler reads it piece by piece instead, with `req.read()`, which returns the next piece, and an empty array when the body has ended. Use it for large uploads that should not be held in memory.
+Like `route`, but the server does **not** read the request body before it calls the handler. The handler reads the body in pieces with `req.read()`. Each call returns the next piece, or an empty array when the body has ended. `routeStream` is for large uploads that must not be kept in memory.
 
 ```nio
 import 'http';
@@ -161,11 +161,11 @@ http.Server s = http.server();
 s.routeStream(http.Method.POST, "/upload", Future<http.Response> (http.Request r) -> count(r));
 ```
 
-On an ordinary route, `req.read()` returns the whole body once, so a handler written with `read` works on both kinds of route.
+On an ordinary route, the first call to `req.read()` returns the full body. As a result, a handler that uses `read` works on both kinds of route.
 
-Streaming is not the default because reading a body means waiting, and only a named `async` function can wait. Making every route stream would stop you writing short handlers inline, as in the `route` examples.
+Reading the body waits. Only a named `async` function can wait. For this reason, a streaming handler must be a named `async` function.
 
-If a streaming handler answers without reading the whole body, the server reads and throws away up to 256 KB of what is left, so the connection can be reused. Past that it closes the connection instead. Before it closes, it keeps reading and throwing away for up to 500 ms, so the client can read the response before the connection is torn down.
+If a streaming handler returns a response before it reads all of the body, the server reads and discards up to 256 KB of the remaining body. The connection can then be used again. If more than 256 KB remains, the server closes the connection. Before it closes the connection, it continues to read and discard data for up to 500 ms. This lets the client read the response.
 
 ## `Server.listen()`
 
@@ -173,14 +173,14 @@ If a streaming handler answers without reading the whole body, the server reads 
 Future<void!> s.listen(String host, int port, http.Options? options)
 ```
 
-Starts the server on `host` and `port` and handles requests until it is closed. It fails if the address cannot be used. Pass `null` for the options to use the defaults.
+Starts the server on `host` and `port`, and handles requests until the server is closed. It fails if the address cannot be used. With `null` as the options, the server uses the defaults.
 
 `http.Options` has three fields, all optional:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `timeout` | `Duration?` | How long to wait on a slow client. |
-| `backlog` | `int?` | How many waiting connections the system keeps. |
+| `timeout` | `Duration?` | How long to wait for a slow client. |
+| `backlog` | `int?` | The maximum number of pending connections that the system keeps. |
 | `maxBody` | `int?` | The largest request body the server reads, in bytes. Default 10 MB. |
 
 ```nio
@@ -193,7 +193,7 @@ await s.listen("0.0.0.0", 8080, o) catch e {
 };
 ```
 
-Host and port are separate arguments, so an IPv6 address needs no brackets: `s.listen("::1", 8080, null)`.
+Host and port are separate arguments. An IPv6 address needs no brackets: `s.listen("::1", 8080, null)`.
 
 ## `Server.bind()`
 
@@ -201,9 +201,9 @@ Host and port are separate arguments, so an IPv6 address needs no brackets: `s.l
 int s.bind(String host, int port, http.Options? options)
 ```
 
-Starts listening on `host` and `port`, and returns the port it got. It takes the same options as [`listen`](#serverlisten), and fails if the address cannot be used. It does not handle requests: call [`serve`](#serverserve) for that.
+Starts listening on `host` and `port`, and returns the port it got. It takes the same options as [`listen`](#serverlisten), and fails if the address cannot be used. It does not handle requests. [`serve`](#serverserve) handles them.
 
-`listen` is `bind` followed by `serve`. Call them separately when you need to know the port before the server starts handling requests — for example in a test, where port `0` asks the system for any free port:
+`listen` is `bind` followed by `serve`. Separate calls are necessary when a program must know the port before the server starts to handle requests. For example, a test can bind to port `0`, which makes the system select a free port:
 
 ```nio
 import 'http';
@@ -226,7 +226,7 @@ print("listening on " + string.from(port));
 Future<void!> s.serve()
 ```
 
-Handles requests until the server is closed. Call [`bind`](#serverbind) first; the example there shows the two together.
+Handles requests until the server is closed. [`bind`](#serverbind) must come first. The example there shows the two together.
 
 ## `Server.port()`
 
@@ -234,7 +234,7 @@ Handles requests until the server is closed. Call [`bind`](#serverbind) first; t
 int s.port()
 ```
 
-Returns the port the server is bound to. After a bind to port `0`, this is the port the system picked.
+Returns the port the server is bound to. After a bind to port `0`, this is the port that the system selected.
 
 ```nio
 import 'http';
@@ -256,7 +256,7 @@ Stops the server.
 
 ## `http.Request`
 
-What a handler receives.
+The request that a handler receives.
 
 ```nio
 type Request {
@@ -275,11 +275,11 @@ type Request {
 }
 ```
 
-`query` is left encoded on purpose: decoding it before splitting it into parameters would lose the difference between a real `&` and an encoded one. `http.parseQuery` does both steps in the right order.
+`query` is not decoded, because a query decoded before it is split cannot show the difference between a real `&` and an encoded `&`. `http.parseQuery` splits the query and then decodes each part.
 
 ## `http.Response`
 
-What a handler returns.
+The response that a handler returns.
 
 ```nio
 type Response {
@@ -300,7 +300,7 @@ These functions build a response:
 | [`http.redirect`](#httpredirect) | an empty body with a `Location` header |
 | [`http.stream`](#httpstream) | a body written in pieces |
 
-A response is a record, so you can change it before returning it. The server adds `Content-Length` for you.
+A response is a record. A handler can change it before it returns it. The server adds `Content-Length`.
 
 ```nio
 import 'http';
@@ -325,7 +325,7 @@ http.Response showUser(http.Request req) {
 http.Response http.text(int status, String body)
 ```
 
-Returns a response with `status` and a `text/plain` body. See [`http.Response`](#httpresponse) for what a response holds.
+Returns a response with `status` and a `text/plain` body. [`http.Response`](#httpresponse) lists the contents of a response.
 
 ```nio
 import 'http';
@@ -342,7 +342,7 @@ print(r.body.length);                          // 5
 http.Response http.json(int status, String encoded)
 ```
 
-Returns a response with `status` and an `application/json` body. `encoded` is JSON text that is already encoded: build it with `json.toText`.
+Returns a response with `status` and an `application/json` body. `encoded` is JSON text that is already encoded. `json.toText` makes this text.
 
 ```nio
 import 'http';
@@ -364,7 +364,7 @@ print(r.headers["content-type"]);              // application/json
 http.Response http.bytes(int status, byte[] body)
 ```
 
-Returns a response with `status` and a raw body with no content type. Set one with `http.setHeader` when it matters.
+Returns a response with `status` and a raw body with no content type. `http.setHeader` adds a content type when the client needs one.
 
 ```nio
 import 'http';
@@ -396,7 +396,7 @@ s.route(http.Method.GET, "/old", http.Response (http.Request r) -> http.redirect
 http.Response http.stream(int status, http.BodyStream produce)
 ```
 
-A response whose body is written in pieces. `produce` is a function the server calls again and again: it returns the next piece of the body, or an empty array when the body is complete.
+Returns a response whose body is written in pieces. `produce` is a function that the server calls repeatedly. Each call returns the next piece of the body, or an empty array when the body is complete.
 
 ```nio
 import 'http';
@@ -423,14 +423,12 @@ s.route(http.Method.GET, "/events", http.Response (http.Request r) -> {
 });
 ```
 
-A few things to know:
+* The server sends the headers before the body length is known. As a result, it sends the response in chunks. It removes any `Content-Length` header that the handler sets.
+* A producer that never returns an empty array makes a response that does not end. Server-sent events use this type of response.
+* The producer can be a function that can fail (`Future<byte[]!>`) or one that cannot fail (`Future<byte[]>`). If the producer fails after the status is sent, the server closes the connection. This tells the client that the body is incomplete.
+* For a `HEAD` request, the server sends only the headers and does not call the producer.
 
-* The body's length is unknown when the headers are sent, so the response is sent in chunks and any `Content-Length` you set is dropped.
-* A producer that never returns an empty array makes a response that never ends — which is exactly what server-sent events are.
-* The producer can be one that fails (`Future<byte[]!>`) or one that cannot (`Future<byte[]>`). If it fails part-way through, the status has already been sent, so the server closes the connection to tell the client the body is incomplete.
-* For a `HEAD` request, only the headers are sent and the producer is never called.
-
-Because a client response's `read` has the same shape, you can pass a response from another server straight through, without holding it in memory:
+A client response's `read` has the same type as a producer. As a result, a server can send a response from another server to its own client without keeping it in memory:
 
 ```nio
 import 'http';
@@ -448,7 +446,7 @@ http.Response async relay(http.Request r) {
 Future<http.ClientResponse!> http.request(http.Method m, String url, http.ClientOptions? options)
 ```
 
-Sends a request and returns the response. Pass `null` for the options when you need none.
+Sends a request and returns the response. The options can be `null`.
 
 ```nio
 import 'http';
@@ -465,7 +463,13 @@ void async fetchUser() {
 }
 ```
 
-**HTTPS works the same way**: give an `https://` URL and the connection is encrypted. The server's certificate is checked by default — it must be signed by an authority your system trusts, it must be valid for the URL's host name, and the server must prove it holds the certificate's key. If any of that fails, the request fails with an error that says which problem it was, such as an expired certificate or the wrong host name.
+**HTTPS works the same way.** If the URL starts with `https://`, the connection is encrypted. By default, the client checks the server's certificate:
+
+* An authority that the system trusts must sign the certificate.
+* The certificate must be valid for the host name in the URL.
+* The server must prove that it holds the certificate's key.
+
+If a check fails, the request fails with an error that identifies the problem, for example an expired certificate or the wrong host name.
 
 ```nio
 import 'http';
@@ -477,11 +481,11 @@ void async fetchPage() {
 }
 ```
 
-There are no shortcuts such as `http.get`: `http.request(http.Method.GET, url, null)` is already short. There is also no connection pool; each request opens its own connection.
+There is no connection pool. Each request opens its own connection.
 
 ## `http.ClientOptions`
 
-The settings for one request. Every field is optional, so `{}` and any mix of fields are valid.
+The settings for one request. Every field is optional. `{}` and any mix of fields are valid.
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -490,8 +494,8 @@ The settings for one request. Every field is optional, so `{}` and any mix of fi
 | `bodyBytes` | `byte[]?` | A binary body to send. Used instead of `body` if both are set. |
 | `timeout` | `Duration?` | How long to wait. A plain number means milliseconds. |
 | `followRedirects` | `bool?` | Follow redirects, up to five. Off by default. |
-| `tls` | `tls.Options?` | Settings for an HTTPS connection, such as your own trusted certificates. See [`tls`](/docs/stdlib/tls). |
-| `maxBody` | `int?` | The largest response body `bytes()` and `text()` will read. No limit by default. |
+| `tls` | `tls.Options?` | Settings for an HTTPS connection, such as a program's own trusted certificates. [`tls`](/docs/stdlib/tls) gives the details. |
+| `maxBody` | `int?` | The largest response body that `bytes()` and `text()` read. No limit by default. |
 
 ```nio
 import 'http';
@@ -501,9 +505,9 @@ http.ClientOptions b = { body: "hello" };
 http.ClientOptions c = { headers: { "x-token": "abc" }, timeout: 5000, followRedirects: true };
 ```
 
-`http.options()` returns an empty set of options, and three methods change its headers without worrying about upper and lower case: `o.setHeader(name, value)`, `o.getHeader(name)` and `o.removeHeader(name)`.
+`http.options()` returns an empty set of options. These three methods read and change its headers, and ignore upper and lower case in header names: `o.setHeader(name, value)`, `o.getHeader(name)` and `o.removeHeader(name)`.
 
-To trust a private certificate authority, pass its certificate through `tls`:
+To trust a private certificate authority, a program passes its certificate through `tls`:
 
 ```nio
 import 'http';
@@ -521,11 +525,11 @@ void async internal() {
 
 > [!WARNING]
 >
-> With no `maxBody`, `await res.text()` reads whatever the server sends, however large. When you call a server you do not control, either set `maxBody`, or read the body piece by piece with `res.read()` and keep only what you need.
+> With no `maxBody`, `await res.text()` reads all of the body that the server sends, with no size limit. A server that the program does not control can send a body of any size. For such a server, set `maxBody`, or read the body in pieces with `res.read()` and keep only the necessary data.
 
 ## `http.ClientResponse`
 
-What `http.request` returns.
+The response that `http.request` returns.
 
 ```nio
 type ClientResponse {
@@ -542,7 +546,7 @@ type ClientResponse {
 }
 ```
 
-Use `await res.text()` or `await res.bytes()` for the whole body. For a large body, read it piece by piece instead; `read()` returns an empty array at the end:
+`await res.text()` and `await res.bytes()` return the full body. A large body can be read in pieces. `read()` returns an empty array at the end of the body:
 
 ```nio
 import 'http';
@@ -562,26 +566,26 @@ void async download() {
 }
 ```
 
-The connection closes by itself once the body has been read to the end. If you stop reading early, call `res.close()`.
+The connection closes automatically when the body has been read to the end. A program that stops reading before the end must call `res.close()`.
 
-A header that appears more than once is joined into one value with commas. `Set-Cookie` is the exception, because cookie values can contain commas; each one is kept separately in `setCookies`.
+A header that occurs more than once is joined into one value with commas. `Set-Cookie` is the exception, because cookie values can contain commas. Each `Set-Cookie` value is kept separately in `setCookies`.
 
 ## Parsing helpers
 
-The pieces the server and client are built from are exported too, for programs that handle HTTP over a connection of their own. The first six below can fail when their input is malformed; the rest always succeed.
+The module also exports the functions that the server and client use. Programs that handle HTTP over their own connections can use them. The first six functions below can fail when their input is malformed. The other functions always succeed.
 
 | Function | What it does |
 | --- | --- |
 | `http.parseRequestLine(line)` | Reads `GET /path?q HTTP/1.1`. |
 | `http.parseStatusLine(line)` | Reads `HTTP/1.1 200 OK`. |
 | `http.parseHeaders(lines)` | Reads the header lines between the first line and the blank one. |
-| `http.framingOf(headers)` | Says how the body is delimited: by `Content-Length`, or in chunks. |
+| `http.framingOf(headers)` | Returns how the body is delimited: by `Content-Length`, or in chunks. |
 | `http.decodeChunked(s, start, maxBody)` | Decodes as many complete chunks as `s` holds. |
 | `http.parseUrl(url)` | Splits a URL into scheme, host, port, path and query. |
 | `http.parseQuery(query)` | Turns `a=1&b=2` into a map, decoding each part. |
 | `http.percentDecode(s)`, `http.percentEncode(s)` | Convert between `%41` and `A`. |
 | `http.getHeader(h, name)`, `http.setHeader(h, name, value)` | Read and write a header, ignoring upper and lower case. |
-| `http.reasonFor(status)` | The standard phrase for a status, such as `Not Found` for 404. |
+| `http.reasonFor(status)` | Returns the standard reason phrase for a status, such as `Not Found` for 404. |
 | `http.CRLF`, `http.CRLF2` | The line ending `"\r\n"`, and the blank line `"\r\n\r\n"` that ends a header block. |
 
 ```nio

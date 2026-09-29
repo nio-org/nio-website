@@ -11,13 +11,13 @@ description: "The Nio tls module opens encrypted TLS 1.3 connections and verifie
 import 'tls';
 ```
 
-The `tls` module opens encrypted connections: it is a TLS 1.3 client, the same protocol a browser uses for `https://`. It needs no outside library; the cryptography underneath comes from [`crypto`](/docs/stdlib/crypto).
+The `tls` module opens encrypted connections. It is a TLS 1.3 client, the protocol that `https://` uses. It has no dependency outside the standard library. The cryptography comes from [`crypto`](/docs/stdlib/crypto).
 
-The server is checked on every connection unless you turn the checks off:
+On each connection, the client checks the server, unless the options turn the checks off:
 
-* its certificate must be signed, through a chain of certificates, by an authority your system trusts;
-* the certificate must be valid for the name you asked for;
-* the server must prove it holds the certificate's private key.
+* the server's certificate must be signed, through a chain of certificates, by an authority that the system trusts;
+* the certificate must be valid for the requested name;
+* the server must prove that it holds the certificate's private key.
 
 ```nio
 import 'tls';
@@ -39,34 +39,34 @@ void async fetch() {
 }
 ```
 
-If what you want to send is HTTP, you do not need this module directly: [`http.request`](/docs/stdlib/http#httprequest) with an `https://` URL does all of the above for you.
+An HTTP request does not need this module directly. [`http.request`](/docs/stdlib/http#httprequest) with an `https://` URL opens the connection and does the same checks.
 
 ## Notes
 
-* **TLS 1.3 only.** Older versions are not supported; nearly every server on the web speaks 1.3.
-* **Two ciphers.** ChaCha20-Poly1305 is always offered. AES-128-GCM is offered too when the processor has AES instructions, since some servers accept nothing else.
-* **Client only.** There is no TLS server. To serve HTTPS, put your server behind a proxy that handles encryption. Client certificates are not supported either: if a server asks for one, the client answers that it has none, which most servers accept.
-* **RSA and ECDSA certificates are supported** (ECDSA on the P-256 and P-384 curves) — between them, what the public web uses. A server using anything else is refused rather than trusted unchecked.
-* **Compare secrets with `string.bytesEqualConstantTime`**, never with `==`. See [`crypto`](/docs/stdlib/crypto).
-* **Most programs need only `tls.connect` and `tls.Options`.** The functions from [`tls.earlySecret()`](#tlsearlysecret) onward are the building blocks the connection is made from, for protocol work and testing.
+* **TLS 1.3 only.** Older versions are not supported.
+* **Two ciphers.** ChaCha20-Poly1305 is always offered. AES-128-GCM is also offered when the processor has AES instructions, because some servers accept only AES-128-GCM.
+* **Client only.** There is no TLS server. To serve HTTPS, a server runs behind a proxy that does the encryption. Client certificates are not supported. If a server requests one, the client replies that it has none. Most servers accept this reply.
+* **RSA and ECDSA certificates are supported** (ECDSA on the P-256 and P-384 curves). A server certificate that uses a different algorithm is refused.
+* **Do not compare secrets with `==`.** Use `string.bytesEqualConstantTime`, which compares them in constant time. [`crypto`](/docs/stdlib/crypto) gives the reason.
+* **Most programs need only `tls.connect` and `tls.Options`.** The functions from [`tls.earlySecret()`](#tlsearlysecret) onward are the parts that a connection is made from. They are for protocol work and tests.
 
 > [!WARNING]
 >
-> **Revoked certificates are not detected.** A certificate that its authority withdrew before it expired is still accepted. This is the usual default for TLS libraries; [`x509`](/docs/stdlib/x509) explains why, and what to use instead.
+> **Revoked certificates are not detected.** A certificate that its authority revoked before its expiry date is still accepted. [`x509`](/docs/stdlib/x509) describes what to use instead.
 
-When a connection fails, the error's `code` tells you why. A certificate problem keeps its [`x509.ErrorCode`](/docs/stdlib/x509#errors) — expired, wrong host name, untrusted — so you can tell the cases apart. Problems with the protocol itself use `tls.ErrorCode`:
+When a connection fails, the error's `code` gives the cause. A certificate problem keeps its [`x509.ErrorCode`](/docs/stdlib/x509#errors), for example expired, wrong host name or untrusted. As a result, the caller can tell the cases apart. Problems with the protocol use `tls.ErrorCode`:
 
 | Code | Meaning |
 | --- | --- |
-| `ILLEGAL_PARAMETER`, `DECODE_ERROR`, `RECORD_OVERFLOW`, `UNEXPECTED_MESSAGE`, `UNSUPPORTED_EXTENSION`, `DECRYPT_ERROR` | The server sent something malformed or out of place. |
-| `HANDSHAKE_FAILURE` | The two sides could not agree on how to talk. |
-| `UNSUPPORTED_CERTIFICATE` | The server's certificate uses something this client cannot check. |
-| `PEER_ALERT` | The server ended the connection with an error of its own. |
-| `TOO_MANY_MESSAGES` | The server sent more of something than any honest server would. |
-| `PIN_MISMATCH` | The certificate is valid, but its key is not one you pinned. See [`tls.Options`](#tlsoptions). |
-| `MISCONFIGURED` | The options you passed contradict each other. Nothing was sent. |
+| `ILLEGAL_PARAMETER`, `DECODE_ERROR`, `RECORD_OVERFLOW`, `UNEXPECTED_MESSAGE`, `UNSUPPORTED_EXTENSION`, `DECRYPT_ERROR` | The server sent a malformed message, or a message at the wrong time. |
+| `HANDSHAKE_FAILURE` | The client and the server did not negotiate a common set of parameters. |
+| `UNSUPPORTED_CERTIFICATE` | The server's certificate uses an algorithm or feature that this client cannot check. |
+| `PEER_ALERT` | The server closed the connection with an error alert. |
+| `TOO_MANY_MESSAGES` | The server sent more messages of one type than this client permits. |
+| `PIN_MISMATCH` | The certificate is valid, but its key is not one of the pinned keys. [`tls.Options`](#tlsoptions) describes pins. |
+| `MISCONFIGURED` | The options contradict each other. Nothing was sent. |
 
-A tampered or replayed message fails with `crypto.ErrorCode.AUTHENTICATION`.
+A changed or replayed message fails with `crypto.ErrorCode.AUTHENTICATION`.
 
 ## `tls.connect()`
 
@@ -74,9 +74,9 @@ A tampered or replayed message fails with `crypto.ErrorCode.AUTHENTICATION`.
 Future<tls.Conn!> tls.connect(String address, String serverName, tls.Options? options)
 ```
 
-Opens a connection to `address` (written `"host:port"`) and sets up encryption. `serverName` is the name the certificate must be valid for; it is also sent to the server, so a server hosting many sites knows which certificate to present. Pass `null` for the options to use the defaults.
+Opens a connection to `address` (written `"host:port"`) and starts encryption. `serverName` is the name that the certificate must be valid for. The client also sends it to the server. This lets a server that hosts many sites select the correct certificate. `null` as the options gives the defaults.
 
-Any failure — no connection, a bad certificate, a protocol error — arrives at the `await`:
+All failures, such as no connection, a bad certificate or a protocol error, occur at the `await`:
 
 ```nio
 import 'tls';
@@ -89,7 +89,7 @@ void async check(String host) {
         } else if (e.code == x509.ErrorCode.HOSTNAME_MISMATCH) {
             print("that certificate is for a different server");
         } else if (e.code == x509.ErrorCode.UNTRUSTED_ROOT) {
-            print("nobody I trust vouches for that certificate");
+            print("certificate not signed by a trusted authority");
         } else {
             print(e.message);
         }
@@ -101,17 +101,17 @@ void async check(String host) {
 
 ## `tls.Options`
 
-The settings for a connection. Every field is optional.
+The settings for a connection. All fields are optional.
 
 | Field | Type | Description |
 | --- | --- | --- |
 | `timeout` | `Duration?` | How long to wait. A plain number means milliseconds. |
-| `alpn` | `String[]?` | The protocols you can speak, such as `["http/1.1"]`. The one the server picks is in `c.alpn`. |
-| `roots` | `x509.Certificate[]?` | Trust only these certificate authorities, instead of the ones your system trusts. |
-| `pins` | `byte[][]?` | Accept only servers whose certificate chain contains one of these keys. |
-| `insecureSkipVerify` | `bool?` | Turn off every check. For tests only. |
+| `alpn` | `String[]?` | The protocols that the client supports, such as `["http/1.1"]`. The protocol that the server selects is in `c.alpn`. |
+| `roots` | `x509.Certificate[]?` | The certificate authorities that the client trusts, in place of the authorities that the system trusts. |
+| `pins` | `byte[][]?` | The client accepts only servers whose certificate chain contains one of these keys. |
+| `insecureSkipVerify` | `bool?` | Turns off all checks. It is only for tests. |
 
-**`roots`** is how you connect to a server whose certificate comes from your own company's authority. It narrows who you trust; it does not switch checking off.
+**`roots`** lets a client connect to a server whose certificate comes from a company's own authority. It limits which authorities the client trusts. It does not turn off the checks.
 
 ```nio
 import 'tls';
@@ -126,7 +126,7 @@ void async internal() {
 }
 ```
 
-**`pins`** goes one step further: after the certificate chain has been checked, the connection is accepted only if some certificate in it carries one of the listed keys. That protects you even from a trusted authority that wrongly issues a certificate for your server's name. A pin is the SHA-256 hash of a certificate's public key, which [`x509.spkiPin`](/docs/stdlib/x509#x509spkipin) computes, or which you can compute with `openssl`:
+**`pins`** adds a further check. After the certificate chain is verified, the connection is accepted only if a certificate in the chain contains one of the listed keys. This protects the client if a trusted authority incorrectly issues a certificate for the server's name. A pin is the SHA-256 hash of a certificate's public key. [`x509.spkiPin`](/docs/stdlib/x509#x509spkipin) calculates it. This `openssl` command also calculates it:
 
 ```sh
 openssl x509 -in server.der -inform DER -pubkey -noout \
@@ -150,33 +150,33 @@ void async pinned() {
 }
 ```
 
-Any certificate in the chain counts, so pinning an intermediate authority's key keeps working as the server's own certificate is renewed.
+Any certificate in the chain can match. A pin on an intermediate authority's key stays valid when the server's own certificate is renewed.
 
 > [!WARNING]
 >
-> **Always pin more than one key.** Pin the key the server uses today *and* the one it will move to next, or an intermediate key that outlives both. If the server switches to a key you did not pin, every client stops connecting until it is updated.
+> **Always pin more than one key.** Pin the key that the server uses now *and* the key that it will use next, or an intermediate key that stays valid longer than both. If the server changes to a key that is not pinned, no client can connect until the clients are updated.
 >
-> An empty `pins` list, or `pins` together with `insecureSkipVerify`, is refused with `MISCONFIGURED`: either would silently connect with nothing pinned.
+> An empty `pins` list, or `pins` together with `insecureSkipVerify`, is refused with `MISCONFIGURED`. Either one would otherwise connect without a pin check and without an error.
 
 > [!CAUTION]
 >
-> `insecureSkipVerify: true` turns off **every** check: the certificate, the host name, and the proof of the key. The connection is still encrypted, but you cannot know who is on the other end, so anyone who can redirect your traffic can read it. It exists only for testing against [`tls.testAccept`](#tlstestaccept).
+> `insecureSkipVerify: true` turns off **all** checks: the certificate, the host name and the proof of the key. The connection is still encrypted, but the client does not know who is on the other end. Anyone who can redirect the traffic can read it. Use it only for tests with [`tls.testAccept`](#tlstestaccept).
 
 ## `tls.Conn`
 
-An open, encrypted connection. Its methods mirror [`net`](/docs/stdlib/net)'s, so code that works with a socket reads the same way.
+An open, encrypted connection. Its methods match the socket functions of [`net`](/docs/stdlib/net).
 
 | Member | Type | Description |
 | --- | --- | --- |
-| `c.read(n)` | `Future<byte[]!>` | Up to `n` bytes; an empty array once the server has finished sending. |
+| `c.read(n)` | `Future<byte[]!>` | Up to `n` bytes. An empty array when the server has finished sending. |
 | `c.write(data)` | `Future<void!>` | Sends all of `data`. |
-| `c.close()` | `Future<void>` | Tells the server you are done, then closes the connection. |
-| `c.closeWrite()` | `Future<void>` | Tells the server you are done sending, but keeps reading. |
-| `c.abort(description)` | `Future<void>` | Closes with an error alert, telling the server what was wrong. |
-| `c.alpn` | `String` | The protocol the server picked, or `""`. |
-| `c.peerCertificates` | `byte[][]` | The server's certificates, its own first, as sent. |
+| `c.close()` | `Future<void>` | Tells the server that the client is done, then closes the connection. |
+| `c.closeWrite()` | `Future<void>` | Tells the server that the client is done sending, but continues to read. |
+| `c.abort(description)` | `Future<void>` | Closes with an error alert that tells the server what was wrong. |
+| `c.alpn` | `String` | The protocol that the server selected, or `""`. |
+| `c.peerCertificates` | `byte[][]` | The server's certificates as sent, with the server's own certificate first. |
 
-Close connections with `close()` rather than just dropping them. The closing message tells the other side the data ended on purpose, rather than being cut off by an attacker.
+`close()` ends a connection correctly. The closing message tells the other side that the data ended intentionally, and not because an attacker cut the connection.
 
 ## `tls.handshakeClient()`
 
@@ -184,7 +184,7 @@ Close connections with `close()` rather than just dropping them. The closing mes
 Future<tls.Conn!> tls.handshakeClient(tls.Transport io, String serverName, tls.Options? options)
 ```
 
-`tls.connect` is a TCP connection followed by `handshakeClient`. You need it only to run TLS over something other than a plain TCP socket. A `tls.Transport` is a record of three functions — `read`, `write` and `close` — so the connection can run over anything that carries bytes, including a fake one in a test. [`tls.socketTransport()`](#tlssockettransport) makes one from a socket.
+`tls.connect` opens a TCP connection and then calls `handshakeClient`. `handshakeClient` is necessary only to run TLS over a transport that is not a plain TCP socket. A `tls.Transport` is a record of three functions, `read`, `write` and `close`. As a result, the connection can run over any byte stream, including a fake one in a test. [`tls.socketTransport()`](#tlssockettransport) makes a transport from a socket.
 
 ## `tls.socketTransport()`
 
@@ -192,7 +192,7 @@ Future<tls.Conn!> tls.handshakeClient(tls.Transport io, String serverName, tls.O
 tls.Transport tls.socketTransport(Socket s, Duration? timeout)
 ```
 
-Makes a `tls.Transport` from a socket, for [`tls.handshakeClient()`](#tlshandshakeclient). Like `handshakeClient`, you need it only when the connection is not a plain TCP socket, such as a Unix socket:
+Makes a `tls.Transport` from a socket, for [`tls.handshakeClient()`](#tlshandshakeclient). As with `handshakeClient`, it is necessary only when the connection is not a plain TCP socket, for example a Unix socket:
 
 ```nio
 import 'tls';
@@ -216,11 +216,11 @@ void async viaUnixSocket() {
 Future<tls.Conn!> tls.testAccept(tls.Transport io, tls.TestConfig config)
 ```
 
-A stand-in server for tests, so you can test TLS code on your own machine without a network.
+A test server. It tests TLS code on the local machine without a network.
 
 > [!WARNING]
 >
-> **This is not a real TLS server and must never be used as one.** It cannot prove it holds its certificate's key, so a client only connects to it with `insecureSkipVerify: true`.
+> **This is not a real TLS server. Do not use it as one.** It cannot prove that it holds its certificate's key. As a result, a client connects to it only with `insecureSkipVerify: true`.
 
 ## `tls.earlySecret()`
 
@@ -228,9 +228,9 @@ A stand-in server for tests, so you can test TLS code on your own machine withou
 byte[] tls.earlySecret(byte[]? psk)
 ```
 
-TLS 1.3 turns one shared secret into every key a connection uses, in three steps. Three functions are the steps, in order: `earlySecret`, [`handshakeSecret`](#tlshandshakesecret) and [`masterSecret`](#tlsmastersecret). The example under [`tls.masterSecret()`](#tlsmastersecret) runs all three.
+TLS 1.3 derives all keys of a connection from one shared secret, in three steps. Three functions do the steps, in this order: `earlySecret`, [`handshakeSecret`](#tlshandshakesecret) and [`masterSecret`](#tlsmastersecret). The example under [`tls.masterSecret()`](#tlsmastersecret) runs all three.
 
-`earlySecret` is the first step. Pass `null` when there is no pre-shared key.
+`earlySecret` is the first step. `psk` is `null` when there is no pre-shared key.
 
 ## `tls.handshakeSecret()`
 
@@ -238,7 +238,7 @@ TLS 1.3 turns one shared secret into every key a connection uses, in three steps
 byte[] tls.handshakeSecret(byte[] early, byte[] shared)
 ```
 
-The second of the [three steps](#tlsearlysecret). It takes the result of `earlySecret` and the secret the two sides agreed on, such as one from `crypto.x25519SharedSecret`.
+The second of the [three steps](#tlsearlysecret). It takes the result of `earlySecret` and the secret that the two sides agreed on, for example a secret from `crypto.x25519SharedSecret`.
 
 ## `tls.masterSecret()`
 
@@ -270,7 +270,7 @@ if (shared != null) {
 byte[] tls.deriveSecret(byte[] secret, String label, byte[] transcriptHash)
 ```
 
-Makes one named 32-byte secret from a step above, using the labels the TLS standard defines, such as `"c hs traffic"`. It is [`tls.hkdfExpandLabel()`](#tlshkdfexpandlabel) with the transcript hash as the context, and fails the same way: with `ILLEGAL_PARAMETER` if the label or transcript hash is too long.
+Makes one named 32-byte secret from a step above, with the labels that the TLS standard defines, such as `"c hs traffic"`. It is [`tls.hkdfExpandLabel()`](#tlshkdfexpandlabel) with the transcript hash as the context. It fails in the same way: with `ILLEGAL_PARAMETER` if the label or the transcript hash is too long.
 
 ```nio
 import 'tls';
@@ -287,7 +287,7 @@ print(binder.length);                    // 32
 byte[] tls.hkdfExpandLabel(byte[] secret, String label, byte[] context, int length)
 ```
 
-The function underneath [`tls.deriveSecret()`](#tlsderivesecret). It makes `length` bytes from `secret`, a label and a context. It fails with `ILLEGAL_PARAMETER` if the label or context is too long.
+The function that [`tls.deriveSecret()`](#tlsderivesecret) uses. It makes `length` bytes from `secret`, a label and a context. It fails with `ILLEGAL_PARAMETER` if the label or the context is too long.
 
 ```nio
 import 'tls';
@@ -304,7 +304,7 @@ print(key.length);                       // 16
 tls.Transcript tls.transcript()
 ```
 
-A running hash of every handshake message so far, which ties each secret to the whole conversation. `t.push(message)` adds one message; `t.hash()` returns the SHA-256 of everything added.
+A running hash of all handshake messages up to this point. It binds each secret to all messages of the handshake. `t.push(message)` adds one message. `t.hash()` returns the SHA-256 of all messages added.
 
 ```nio
 import 'tls';
@@ -322,7 +322,7 @@ print(t.hash().length);                  // 32
 tls.TrafficKeys tls.trafficKeys(byte[] trafficSecret, int keyLength)
 ```
 
-Makes the key and the 12-byte starting value for one direction of a connection, as the fields `key` and `iv`. `keyLength` is 32 for ChaCha20-Poly1305 and 16 for AES-128-GCM.
+Makes the key and the 12-byte initialization vector for one direction of a connection, as the fields `key` and `iv`. `keyLength` is 32 for ChaCha20-Poly1305 and 16 for AES-128-GCM.
 
 ```nio
 import 'tls';
@@ -339,7 +339,7 @@ print(k.iv.length);                      // 12
 byte[] tls.finishedVerifyData(byte[] trafficSecret, byte[] transcriptHash)
 ```
 
-Computes the value each side sends to prove it saw the same handshake. Check a received one with `string.bytesEqualConstantTime`:
+Calculates the value that each side sends to prove that it saw the same handshake. `string.bytesEqualConstantTime` checks a received value:
 
 ```nio
 import 'tls';
@@ -357,9 +357,9 @@ bool finishedOk(byte[] trafficSecret, tls.Transcript t, byte[] received) {
 byte[] tls.plaintextRecord(int contentType, byte[] payload)
 ```
 
-Everything TLS sends travels in records: a 5-byte header followed by up to 16 KB of data. The types of record are in `tls.ContentType`: `CHANGE_CIPHER_SPEC`, `ALERT`, `HANDSHAKE` and `APPLICATION_DATA`.
+TLS sends all data in records. A record is a 5-byte header followed by up to 16 KB of data. The record types are in `tls.ContentType`: `CHANGE_CIPHER_SPEC`, `ALERT`, `HANDSHAKE` and `APPLICATION_DATA`.
 
-`plaintextRecord` wraps a payload that is sent unencrypted, and fails with `RECORD_OVERFLOW` for one larger than 16 KB.
+`plaintextRecord` wraps a payload that is sent unencrypted. It fails with `RECORD_OVERFLOW` for a payload larger than 16 KB.
 
 ```nio
 import 'tls';
@@ -376,7 +376,11 @@ print(record.length);                    // 10: the header and the payload
 tls.RecordHeader tls.parseRecordHeader(byte[] data)
 ```
 
-Reads the type and length of a [record](#tlsplaintextrecord) from its first five bytes, as the fields `contentType` and `length`. The length is that of the data after the header. It fails with `DECODE_ERROR` when there are fewer than five bytes, with `UNEXPECTED_MESSAGE` when the type is not one of the four in `tls.ContentType`, and with `RECORD_OVERFLOW` when the length is larger than any record may be.
+Reads the type and the length of a [record](#tlsplaintextrecord) from its first five bytes, as the fields `contentType` and `length`. The length is the length of the data after the header. It fails with:
+
+* `DECODE_ERROR` when there are fewer than five bytes;
+* `UNEXPECTED_MESSAGE` when the type is not one of the four in `tls.ContentType`;
+* `RECORD_OVERFLOW` when the length is larger than the maximum record size.
 
 ```nio
 import 'tls';
@@ -398,9 +402,9 @@ if (h != null) {
 tls.RecordProtection tls.protectionKeys(byte[] trafficSecret, int suite)
 ```
 
-Encrypts and decrypts records for **one direction** of a connection, so a connection holds two. `suite` is `tls.TLS_CHACHA20_POLY1305_SHA256` or `tls.TLS_AES_128_GCM_SHA256`. `p.seal(contentType, payload)` encrypts a record, and `p.open(record)` checks and decrypts one, returning a `tls.InnerPlaintext` with the real `contentType` and `data`.
+Encrypts and decrypts records for **one direction** of a connection. A connection uses two of them. `suite` is `tls.TLS_CHACHA20_POLY1305_SHA256` or `tls.TLS_AES_128_GCM_SHA256`. `p.seal(contentType, payload)` encrypts a record. `p.open(record)` verifies and decrypts a record, and returns a `tls.InnerPlaintext` with the real `contentType` and `data`.
 
-Each side counts its records, and the count is mixed into the encryption, so a record that is replayed or delivered out of order fails to decrypt.
+Each side counts its records and includes the count in the encryption. As a result, a record that is replayed or delivered out of order fails to decrypt.
 
 ```nio
 import 'tls';

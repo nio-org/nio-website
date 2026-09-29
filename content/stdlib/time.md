@@ -107,7 +107,7 @@ print(before < 0);                   // true
 int time.milliseconds(Duration duration)
 ```
 
-Returns a duration as a plain number of milliseconds.
+Returns the number of milliseconds in a duration, as an `int`.
 
 ```nio
 import 'time';
@@ -122,7 +122,7 @@ print(time.milliseconds(timeout));   // 120000
 Future<void> time.sleep(Duration duration)
 ```
 
-Returns a future that completes after the duration. Await the future to pause the current task while allowing other async work to continue.
+Returns a future that completes after the duration. An `await` on the future pauses the current task. Other async work continues during the pause.
 
 A negative duration is treated as zero.
 
@@ -223,7 +223,7 @@ print(time.date.day(date));         // 25
 DateTime time.date.addDays(DateTime date, int days)
 ```
 
-Adds or subtracts whole UTC days while preserving the time of day.
+Adds or subtracts whole UTC days and returns the result. The time of day does not change.
 
 ```nio
 import 'time';

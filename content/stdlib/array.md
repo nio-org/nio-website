@@ -1,6 +1,6 @@
 ---
 title: "array module"
-description: "The Nio array module: push, pop, copy, slice, search and sort arrays, and transform them with map, filter, reduce, find, some and every."
+description: "The Nio array module pushes, pops, copies, slices, searches and sorts arrays, and transforms them with map, filter, reduce, find, some and every."
 ---
 
 # Array
@@ -18,7 +18,7 @@ The `array` module adds common operations such as adding, removing, copying, sli
 * `push`, `pop`, and `sort` change the original array. `copy` and `slice` return a new growable array.
 * `push` and `pop` only accept growable arrays (`T[]`). Fixed-size arrays (`T[N]`) cannot change length.
 * The other functions accept growable and fixed-size arrays.
-* These are module functions: use `array.push(xs, value)`, not `xs.push(value)`.
+* These are module functions. The call is `array.push(xs, value)`, not `xs.push(value)`.
 
 ## `array.push()`
 
@@ -45,7 +45,7 @@ print(numbers.length);   // 3
 T array.pop(T[] a)
 ```
 
-Removes and returns the last value in `a`. Calling `pop` on an empty array causes a runtime error, so check `.length` first when the array may be empty.
+Removes and returns the last value in `a`. Calling `pop` on an empty array causes a runtime error. When the array can be empty, a program can check `.length` first.
 
 ```nio
 import 'array';
@@ -89,7 +89,7 @@ T[] array.slice(T[] a, int start, int end)
 T[] array.slice(T[] a, int start)
 ```
 
-Returns a new growable array from `start` up to, but not including, `end`. Leave out `end` to copy through the end of the array.
+Returns a new growable array from `start` up to, but not including, `end`. Without `end`, the copy continues to the end of the array.
 
 The bounds must satisfy `0 <= start <= end <= a.length`; invalid bounds cause a runtime error.
 
@@ -130,7 +130,7 @@ void array.sort(T[] a, Function(T, T)<bool> compare)
 
 Sorts `a` in place. Without a comparator, values are sorted in ascending order. This works for values that support `<`, including numbers, strings, dates, durations, and enums.
 
-Pass a comparator to choose another order or to sort records. It should return `true` when its first value belongs before its second value. Sorting is stable, so values that compare equal keep their original order.
+A comparator sets another order, or sorts records. It returns `true` when its first value belongs before its second value. Sorting is stable. Values that compare equal keep their original order.
 
 The comparator cannot be fallible and must not add or remove elements from the array being sorted.
 
@@ -161,9 +161,9 @@ print(people[0].name);          // cara
 U[] array.map(T[] a, Function(T)<U> f)
 ```
 
-A new array holding `f(v)` for every element `v` of `a`, in order. The result's
-element type is whatever `f` answers, so the function is written with its
-types: `int (int n) -> n * 2`.
+Returns a new array that holds `f(v)` for each element `v` of `a`, in order.
+The element type of the result is the return type of `f`. The function literal
+states its types: `int (int n) -> n * 2`.
 
 ```nio
 import 'array';
@@ -180,8 +180,8 @@ String[] texts = array.map(nums, String (int n) -> string.from(n));
 T[] array.filter(T[] a, Function(T)<bool> keep)
 ```
 
-A new array of the elements for which `keep` answers `true`, in order. `a` is
-unchanged.
+Returns a new array of the elements for which `keep` returns `true`, in order.
+`a` does not change.
 
 ```nio
 import 'array';
@@ -196,9 +196,10 @@ int[] evens = array.filter(nums, bool (int n) -> n % 2 == 0);   // [2, 4, 6]
 U array.reduce(T[] a, U start, Function(U, T)<U> f)
 ```
 
-Folds `a` into one value: the result is `f(f(f(start, a[0]), a[1]), ...)`,
-and `start` for an empty array. The type of `start` fixes the type of the
-result and of the function's first parameter.
+Combines the elements of `a` into one value and returns it. The result is
+`f(f(f(start, a[0]), a[1]), ...)`. For an empty array, the result is `start`.
+The type of `start` sets the type of the result and of the first parameter of
+the function.
 
 ```nio
 import 'array';
@@ -215,8 +216,8 @@ String csv = array.reduce(nums, "", String (String acc, int n) -> acc + string.f
 T? array.find(T[] a, Function(T)<bool> test)
 ```
 
-The first element for which `test` answers `true`, or `null` when none does.
-Elements after the first match are not visited.
+Returns the first element for which `test` returns `true`, or `null` when no
+element matches. Elements after the first match are not visited.
 
 ```nio
 import 'array';
@@ -234,8 +235,9 @@ if (big != null) {
 bool array.some(T[] a, Function(T)<bool> test)
 ```
 
-Whether `test` answers `true` for at least one element. On an empty array it
-is `false`. It stops at the first element for which `test` answers `true`.
+Returns `true` when `test` returns `true` for at least one element. On an
+empty array, it returns `false`. It stops at the first element for which `test`
+returns `true`.
 
 ```nio
 import 'array';
@@ -251,8 +253,9 @@ print(array.some(nums, bool (int n) -> n > 9));        // false
 bool array.every(T[] a, Function(T)<bool> test)
 ```
 
-Whether `test` answers `true` for every element. On an empty array it is
-`true`. It stops at the first element for which `test` answers `false`.
+Returns `true` when `test` returns `true` for every element. On an empty
+array, it returns `true`. It stops at the first element for which `test`
+returns `false`.
 
 ```nio
 import 'array';
@@ -262,10 +265,10 @@ print(array.every(nums, bool (int n) -> n % 2 == 0));  // true
 print(array.every(nums, bool (int n) -> n > 2));       // false
 ```
 
-The function passed to any of the six above cannot be fallible: the loop has
-no way to report an error raised inside it, so catch it in the function. Do
-not change the array from inside the function; a push or a pop under the loop
-is a defect, as it is under `array.sort`.
+The function given to one of the six functions above cannot be fallible. The
+loop cannot report an error from the function. The function must catch its own
+errors. The function must not add or remove elements of the array. This rule
+also applies to `array.sort`.
 
 ## `array.contains()`
 
@@ -273,8 +276,9 @@ is a defect, as it is under `array.sort`.
 bool array.contains(T[] a, T v)
 ```
 
-Whether some element equals `v`, by the same rule as `==` (and as
-[`array.indexOf`](#arrayindexof)): the element type must be one `==` accepts.
+Returns `true` when an element equals `v`. The comparison uses the same rule
+as `==` and [`array.indexOf`](#arrayindexof). The element type must be a type
+that `==` accepts.
 
 ```nio
 import 'array';
@@ -304,8 +308,8 @@ array.reverse(nums);                      // [3, 2, 1]
 void array.fill(T[] a, T v)
 ```
 
-Sets every element of `a` to `v`, in place. The length does not change, which
-is what makes it the way to reset a fixed-size array.
+Sets each element of `a` to `v`, in place. The length does not change. It can
+reset a fixed-size array.
 
 ```nio
 import 'array';
@@ -320,8 +324,8 @@ array.fill(slots, -1);
 T[] array.concat(T[] a, T[] b)
 ```
 
-A new array of the elements of `a` followed by those of `b`. Neither argument
-changes.
+Returns a new array that holds the elements of `a` followed by the elements
+of `b`. Neither argument changes.
 
 ```nio
 import 'array';
@@ -337,8 +341,8 @@ int[] all = array.concat(head, tail);     // [1, 2, 3]
 T[] array.flatten(T[][] a)
 ```
 
-A new array of the elements of every inner array, in order. Only one level is
-removed: a `T[][][]` flattens to a `T[][]`.
+Returns a new array that holds the elements of each inner array, in order.
+It removes only one level: a `T[][][]` becomes a `T[][]`.
 
 ```nio
 import 'array';

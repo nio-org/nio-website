@@ -11,14 +11,14 @@ description: "The Nio string module: search, split, join, slice, trim, convert a
 import 'string';           // or: import 'string' as str;
 ```
 
-The `String` *type* is built into the language; the `string` *functions* live in a built-in module that must be imported first. They search, slice apart, join back together, reshape, and measure strings, convert between a string and its raw bytes, and convert between a string and the value it spells.
+The `String` *type* is built into the language. The `string` *functions* are in a built-in module that a program must import first. The functions search, split, join, change and measure strings. They also convert between a string and its bytes, and between a string and the value that it represents.
 
 ## Notes
 
-* Strings are **immutable**. Every function here leaves its arguments untouched and returns its result as a new string — there is no in-place variant of anything.
-* Positions and lengths count **bytes**, not characters, so a multi-byte UTF-8 character counts as many elements as it has bytes. `string.length("café")` is 5. What counts characters is `runeCount`, and what walks them is `forEach` over the string (see [Basics](/docs/basics#strings-are-bytes)).
-* Case mapping covers **ASCII only**, and the names say so: `toUpperCaseAscii` and `toLowerCaseAscii` leave every byte outside `a`–`z` / `A`–`Z` exactly as it was. Full Unicode case mapping is a table that belongs in a package.
-* Strings can contain any byte, including `0`. Indexing a string returns a read-only `byte`; use `toByteArray` and `fromByteArray` to convert the complete value.
+* Strings are **immutable**. No function in this module changes its arguments. Each function returns its result as a new string.
+* Positions and lengths count **bytes**, not characters. A multi-byte UTF-8 character counts as one element for each of its bytes. `string.length("café")` is 5. `runeCount` counts characters. `forEach` over the string iterates over characters (see [Basics](/docs/basics#strings-are-bytes)).
+* Case mapping covers **ASCII only**. `toUpperCaseAscii` and `toLowerCaseAscii` do not change bytes outside `a`–`z` and `A`–`Z`.
+* Strings can contain any byte, including `0`. Indexing a string returns a read-only `byte`. `toByteArray` and `fromByteArray` convert the complete value.
 
 ## `string.append()`
 
@@ -26,7 +26,7 @@ The `String` *type* is built into the language; the `string` *functions* live in
 String string.append(String s, String t)
 ```
 
-`string.append(s, t)` returns `s` followed by `t`. It is the same operation as `s + t`, spelled as a function for when one is wanted as a value.
+`string.append(s, t)` returns `s` followed by `t`. It is the same operation as `s + t`. It is useful when a program needs the operation as a function value.
 
 ```nio
 import 'string';
@@ -41,9 +41,9 @@ print("nio" + "lang");                 // niolang — the same thing
 bool string.equalsConstantTime(String a, String b)
 ```
 
-Reports whether `a` and `b` hold the same bytes, in a time that depends only on their length — never on *where* they first differ. [`string.bytesEqualConstantTime`](#stringbytesequalconstanttime) is the same comparison for two `byte[]` values.
+Reports whether `a` and `b` hold the same bytes. The time that it takes depends only on their length. It does not depend on the position of the first difference. [`string.bytesEqualConstantTime`](#stringbytesequalconstanttime) is the same comparison for two `byte[]` values.
 
-Use it whenever one side is a secret: a session token, an API key, a MAC or a signature.
+It is the correct comparison when one side is a secret: a session token, an API key, a MAC or a signature.
 
 ```nio
 import 'string';
@@ -56,11 +56,11 @@ print(checkToken("s3cret", "s3cret"));   // true
 print(checkToken("s3creT", "s3cret"));   // false
 ```
 
-`==` is the wrong tool there. It stops at the first differing byte, so how long it takes tells an attacker how much of their guess was right, and a guess can be refined one byte at a time until it is correct. The constant-time functions combine every byte and test once at the end, so there is no early exit to measure.
+`==` is not safe for secrets. `==` stops at the first byte that is different. Its duration tells an attacker how many bytes of a guess are correct. An attacker can then find the secret one byte at a time. The constant-time functions compare every byte and test the result once, at the end.
 
-What they do **not** hide is the length: two values of different lengths are unequal without reading a byte of either. That is deliberate — the length of a token or a MAC is public. If the length itself is the secret, pad before comparing.
+These functions do **not** hide the length. If the two values have different lengths, the result is `false` and no bytes are read. When the length is a secret, the caller must pad the values to the same length before the comparison.
 
-It allocates nothing, so a [`noalloc`](/docs/memory) function can call it.
+It allocates nothing. A [`noalloc`](/docs/memory) function can call it.
 
 ## `string.bytesEqualConstantTime()`
 
@@ -68,9 +68,9 @@ It allocates nothing, so a [`noalloc`](/docs/memory) function can call it.
 bool string.bytesEqualConstantTime(byte[] a, byte[] b)
 ```
 
-Reports whether `a` and `b` hold the same bytes, in a time that depends only on their length — never on *where* they first differ. It is the `byte[]` form of [`string.equalsConstantTime`](#stringequalsconstanttime); read that section for why `==` is the wrong tool for a secret.
+Reports whether `a` and `b` hold the same bytes. The time that it takes depends only on their length. It does not depend on the position of the first difference. It is the `byte[]` form of [`string.equalsConstantTime`](#stringequalsconstanttime). That section tells why `==` is not safe for secrets.
 
-It does not hide the length: two arrays of different lengths are unequal without reading a byte of either. It allocates nothing, so a [`noalloc`](/docs/memory) function can call it.
+It does not hide the length. If the two arrays have different lengths, the result is `false` and no bytes are read. It allocates nothing. A [`noalloc`](/docs/memory) function can call it.
 
 ```nio
 import 'string';
@@ -105,7 +105,7 @@ String string.copy(String s)
 
 `string.copy(s)` returns a new string with the same bytes.
 
-Since strings are immutable, a copy is never needed to protect one from change; it matters only when a fresh allocation is wanted for its own sake.
+Strings are immutable. A copy is not necessary to protect a string from changes. `copy` is only for a program that needs a new allocation.
 
 ```nio
 import 'string';
@@ -122,7 +122,7 @@ print(c == s);     // true — equality is by content
 int string.find(String s, String sub)
 ```
 
-`string.find(s, sub)` returns the **byte** index of the first occurrence of `sub` in `s`, or `-1` when there is none. Searching for the empty string answers `0`.
+`string.find(s, sub)` returns the **byte** index of the first occurrence of `sub` in `s`, or `-1` when there is none. A search for the empty string returns `0`.
 
 The result is a byte offset, not a character position.
 
@@ -165,7 +165,7 @@ print(string.from(missing));                 // null
 String string.fromByteArray(byte[] bytes)
 ```
 
-`string.fromByteArray(bytes)` builds a string from those bytes. A `0` element remains part of the result.
+`string.fromByteArray(bytes)` returns a string that holds those bytes. A `0` element stays in the result.
 
 ```nio
 import 'string';
@@ -181,9 +181,9 @@ print(string.length(string.fromByteArray([97, 0, 98])));  // 3
 String string.join(String[] parts, String sep)
 ```
 
-`string.join(parts, sep)` returns the elements of `parts` in order with `sep` between each adjacent pair — the inverse of [`split`](#stringsplit).
+`string.join(parts, sep)` returns the elements of `parts` in order with `sep` between each adjacent pair. It is the inverse of [`split`](#stringsplit).
 
-The separator goes *between* pieces, so it appears one time fewer than there are elements. An empty array joins to the empty string and a one-element array to that element, neither of them touching `sep`. Unlike `split`, an empty separator is fine here: it concatenates.
+The separator goes only *between* elements. The result holds one separator fewer than there are elements. An empty array gives the empty string. A one-element array gives that element, with no separator. An empty separator is permitted: the elements are joined with nothing between them.
 
 ```nio
 import 'string';
@@ -222,7 +222,7 @@ print(string.length(""));        // 0
 String string.replace(String s, String old, String new)
 ```
 
-`string.replace(s, old, new)` returns `s` with the **first** occurrence of `old` replaced by `new`. When `old` does not occur, the result is `s` unchanged — and so it is when `old` is empty, since every position matches it and none of them means anything.
+`string.replace(s, old, new)` returns `s` with the **first** occurrence of `old` replaced by `new`. When `old` does not occur, or when `old` is empty, the result is `s` unchanged.
 
 ```nio
 import 'string';
@@ -238,7 +238,7 @@ print(string.replace("abc", "", "+"));      // abc — an empty old changes noth
 String string.replaceAll(String s, String old, String new)
 ```
 
-`string.replaceAll(s, old, new)` returns `s` with **every** occurrence of `old` replaced by `new`, left to right. The replacements themselves are never rescanned, so a replacement that contains `old` does not loop. As in `replace`, an empty `old` leaves `s` unchanged.
+`string.replaceAll(s, old, new)` returns `s` with **every** occurrence of `old` replaced by `new`, left to right. The function does not search the inserted text again. As a result, a `new` that contains `old` does not cause a loop. As in `replace`, an empty `old` leaves `s` unchanged.
 
 ```nio
 import 'string';
@@ -253,9 +253,9 @@ print(string.replaceAll("aa", "a", "aa"));      // aaaa — not rescanned
 String[] string.split(String s, String sep)
 ```
 
-`string.split(s, sep)` returns the pieces of `s` between occurrences of `sep`, separators omitted, as a new growable array.
+`string.split(s, sep)` returns the parts of `s` between occurrences of `sep`, without the separators, in a new growable array.
 
-It keeps empty pieces: a leading, trailing, or doubled separator contributes an empty string, so [`string.join(string.split(s, sep), sep)`](#stringjoin) is `s` again for any non-empty `sep`. A string with no separator in it splits into one piece — itself.
+It keeps empty parts. A leading, trailing or doubled separator gives an empty string. As a result, [`string.join(string.split(s, sep), sep)`](#stringjoin) is equal to `s` for any non-empty `sep`. If `s` does not contain `sep`, the result is an array that holds only `s`.
 
 An empty separator causes a runtime error.
 
@@ -300,7 +300,7 @@ byte[] string.toByteArray(String s)
 
 `string.toByteArray(s)` returns the bytes of `s`, one `byte` element each, in a new growable array. Writing into that array does not change the string.
 
-It is the byte-array form accepted by [`fs.writeFile`](/docs/stdlib/fs).
+[`fs.writeFile`](/docs/stdlib/fs) accepts this byte-array form.
 
 ```nio
 import 'string';
@@ -316,9 +316,9 @@ print(json.toText(string.toByteArray("é")));   // [195,169]
 float string.toFloat(String s)   // fallible
 ```
 
-`string.toFloat(s)` returns the float `s` spells. It accepts an optional sign, digits with an optional `.` fraction (either side of the dot may be empty, but not both), and an optional `e`/`E` exponent — and nothing else: no whitespace (`trim` first), no `inf`, no hex.
+`string.toFloat(s)` returns the float that `s` represents. It accepts an optional sign, then digits with an optional `.` fraction, then an optional `e` or `E` exponent. Either side of the `.` can be empty, but not both. It accepts nothing else: no whitespace, no `inf` and no hexadecimal. `trim` removes whitespace before the conversion.
 
-It is **fallible** ([errors](/docs/errors)): text that is not a number is the expected case for a parser, so it is an `Error` you can catch — or answer with a default — rather than a crash. A value too large for a float is an error too; one too small to distinguish from zero rounds there.
+It is **fallible** ([errors](/docs/errors)). If the text is not a number, the function raises an `Error`. The caller can catch the error or replace it with a default value. A value too large for a float is also an error. A value too small to distinguish from zero rounds to zero.
 
 ```nio
 import 'string';
@@ -338,9 +338,9 @@ string.toFloat("1e999") catch e {
 int string.toInt(String s)   // fallible
 ```
 
-`string.toInt(s)` returns the integer `s` spells: an optional sign followed by decimal digits, and nothing else — no whitespace (`trim` first), no separators, no hex.
+`string.toInt(s)` returns the integer that `s` represents. `s` must be an optional sign followed by decimal digits. It must not contain whitespace, separators or hexadecimal digits. `trim` removes whitespace before the conversion.
 
-It is **fallible** ([errors](/docs/errors)), like `toFloat`: text that is not an integer, or an integer that does not fit in 64 bits, is an `Error` rather than a crash or a silent wrap. Catch it, or let it propagate like any other error.
+It is **fallible** ([errors](/docs/errors)), like `toFloat`. Text that is not an integer, or an integer that does not fit in 64 bits, is an `Error`. The function does not stop the program and does not wrap the value. The caller can catch the error, or let it propagate like any other error.
 
 ```nio
 import 'string';
@@ -366,7 +366,7 @@ print(port);                                  // 8080
 String string.toLowerCaseAscii(String s)
 ```
 
-`string.toLowerCaseAscii(s)` returns `s` with ASCII `A`–`Z` mapped to `a`–`z`, and every other byte left alone. The name is the promise: what a byte-oriented function can honestly do is the ASCII half.
+`string.toLowerCaseAscii(s)` returns `s` with ASCII `A`–`Z` changed to `a`–`z`. It does not change other bytes.
 
 ```nio
 import 'string';
@@ -381,9 +381,9 @@ print(string.toLowerCaseAscii("ÉCOLE"));      // École — only the ASCII lett
 uint string.toUint(String s)   // fallible
 ```
 
-`string.toUint(s)` returns the unsigned integer `s` spells: an optional `+` followed by decimal digits. It is `toInt` in the [unsigned family](/docs/basics#the-unsigned-types), and it exists because `toInt` cannot stand in for it — an `int` does not assign to a `uint`, and the top half of a `uint64` has no `int` to come back as.
+`string.toUint(s)` returns the unsigned integer that `s` represents: an optional `+` followed by decimal digits. It is the form of `toInt` for the [unsigned family](/docs/basics#the-unsigned-types). `toInt` cannot do this, because an `int` does not assign to a `uint`, and values in the top half of the `uint64` range do not fit in an `int`.
 
-It is **fallible** for the same reasons `toInt` is, with one case of its own: a well-formed negative is *out of range* rather than badly shaped, since `-1` is a perfectly good integer and simply not one this type has.
+It is **fallible** for the same reasons as `toInt`. It also fails for a well-formed negative number, with an *out of range* error, not a format error.
 
 ```nio
 import 'string';
@@ -402,7 +402,7 @@ string.toUint("-1") catch e {
 String string.toUpperCaseAscii(String s)
 ```
 
-`string.toUpperCaseAscii(s)` returns `s` with ASCII `a`–`z` mapped to `A`–`Z`, and every other byte left alone. `toUpperCaseAscii("straße")` is `"STRAßE"`: the `ß` is not an ASCII letter, so it stays.
+`string.toUpperCaseAscii(s)` returns `s` with ASCII `a`–`z` changed to `A`–`Z`. It does not change other bytes. `toUpperCaseAscii("straße")` is `"STRAßE"`, because `ß` is not an ASCII letter.
 
 ```nio
 import 'string';
@@ -433,7 +433,7 @@ print(string.length(string.trim("   ")));  // 0
 int string.runeCount(String s)
 ```
 
-How many code points `forEach` over `s` would visit: each valid UTF-8 sequence counts one, and each byte outside a valid sequence counts one. `string.runeCount("café")` is 4 where `string.length` is 5.
+Returns the number of code points that `forEach` visits in `s`. Each valid UTF-8 sequence counts as one, and each byte outside a valid sequence counts as one. `string.runeCount("café")` is 4, and `string.length("café")` is 5.
 
 ```nio
 import 'string';
@@ -448,9 +448,9 @@ print(string.length("café"));       // 5
 int string.runeAt(String s, int i)
 ```
 
-The code point that starts at **byte** offset `i` — exactly what `forEach` binds at that offset — or `0xFFFD` for a byte that begins no valid sequence. An `i` outside `0 ≤ i < string.length(s)` is a runtime error.
+Returns the code point that starts at **byte** offset `i`. This is the same value that `forEach` binds at that offset. If the byte at `i` does not start a valid sequence, the result is `0xFFFD`. An `i` outside `0 ≤ i < string.length(s)` is a runtime error.
 
-The offset is a byte offset, not a character index, so the call costs nothing. Finding the *n*-th character means walking to it, and that is written as the walk:
+The offset is a byte offset, not a character index. As a result, the call does not iterate over the string. To find the *n*-th character, a program iterates with `forEach` and counts:
 
 ```nio
 import 'string';
@@ -473,7 +473,7 @@ forEach(s, r, i) {
 String string.fromRunes(int[] runes)
 ```
 
-The UTF-8 encoding of each code point in turn. A value that is not a code point — negative, above `0x10FFFF`, or in the surrogate range `0xD800`–`0xDFFF` — is written as `0xFFFD`, so the result is always valid UTF-8.
+Returns a string that holds the UTF-8 encoding of each code point, in order. A value that is not a code point (negative, above `0x10FFFF`, or in the surrogate range `0xD800`–`0xDFFF`) is written as `0xFFFD`. Because of this, the result is always valid UTF-8.
 
 ```nio
 import 'string';
@@ -488,7 +488,7 @@ print(string.fromRunes([0x1F600]));                    // 😀, four bytes
 bool string.isValidUtf8(String s)
 ```
 
-Whether every byte of `s` belongs to a valid UTF-8 sequence: no overlong encodings, no surrogates, nothing above `0x10FFFF`, and no truncated tail. Every string a program builds from literals and from `fromRunes` is valid; one read from a file or a socket may not be, and `substring` can cut a character in half. Check before handing text on to something that will refuse it.
+Reports whether every byte of `s` is part of a valid UTF-8 sequence. Valid UTF-8 has no overlong encodings, no surrogates, no values above `0x10FFFF` and no incomplete sequence at the end. A string built from literals or from `fromRunes` is always valid. A string read from a file or a socket can be invalid, and `substring` can split a character. `isValidUtf8` checks the text before it goes to a function or system that requires valid UTF-8.
 
 ```nio
 import 'string';

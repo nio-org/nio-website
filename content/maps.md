@@ -1,30 +1,30 @@
 ---
 title: "Maps"
-description: "Maps in Nio are hash maps that keep insertion order: declare them, read and write entries, write map literals, iterate and convert to JSON."
+description: "Maps in Nio are hash maps that keep insertion order. This page shows how to declare them, read and write entries, write map literals, iterate and convert to JSON."
 ---
 
 # Maps
 
-A `Map<K, V>` is a hash map: a mutable collection of key → value entries with fast lookup by key, iterated in insertion order. The type is part of the language — declaring, indexing, and literals need no import; only the functions of the [map library](/docs/stdlib/map) do.
+A `Map<K, V>` is a hash map: a mutable collection of key → value entries with fast lookup by key. Iteration follows insertion order. The type is part of the language. Declarations, indexing and literals need no import. Only the functions of the [map library](/docs/stdlib/map) need an import.
 
 ## Declaring maps
 
-A map declared without an initializer starts empty, like a growable array:
+A map declared without an initializer is empty, like a growable array:
 
 ```nio
 Map<String, int> ages;
 print(ages.length);          // 0
 ```
 
-Keys are `String` or one of the scalar types compared by value: the integer types, `bool`, `DateTime`, `Duration`, and enums. Floats cannot key a map — NaN never equals itself, so a float key could be stored and never found — and neither can records or arrays, which compare by reference. String keys hash and compare by *content*: a key built at run time finds an entry stored under a literal.
+A key is a `String` or one of the scalar types that compare by value: the integer types, `bool`, `DateTime`, `Duration` and enums. A float cannot be a key, because NaN is not equal to itself. A lookup could never find an entry with a NaN key. Records and arrays cannot be keys, because they compare by reference. String keys hash and compare by *content*. As a result, a key built at run time finds an entry stored under a literal.
 
-Values may be any type except an optional, because lookup already yields one (below): `Map<String, int?>` is a compile error — store the `int`.
+A value can have any type except an optional, because a lookup already returns an optional (see below). `Map<String, int?>` is a compile error. The value type is `int` instead.
 
-Like arrays and records, a map is a reference: assignment and parameter passing share the one map, and `map.copy` makes a shallow copy.
+Like arrays and records, a map is a reference. Assignment and parameter passing share the same map. `map.copy` makes a shallow copy.
 
 ## Writing and reading
 
-`m[k] = v` inserts the key or overwrites its value. `m[k]` reads, and yields `V?` — an absent key is normal data, not an error, so the result is `null` rather than a crash, and it composes with [narrowing](/docs/basics) like any other optional:
+`m[k] = v` inserts the key or overwrites its value. `m[k]` reads the value and returns `V?`. A missing key is not an error: the result is `null`. The result can be [narrowed](/docs/basics) like any other optional:
 
 ```nio
 Map<String, int> ages;
@@ -39,7 +39,7 @@ print(ages["carol"]);        // null
 print(ages.length);          // 1
 ```
 
-A lookup is not a *path*, so `m[k]` itself never narrows — bind it to a variable and test that. For the same reason `m[k]++` is a compile error; the read-modify-write is spelled out:
+Narrowing applies to variables and record fields, not to a map lookup. As a result, a null test on `m[k]` does not narrow `m[k]`. A program assigns the lookup to a variable and tests the variable. `m[k]++` is also a compile error. A program writes the read, the change and the write as separate steps:
 
 ```nio
 Map<String, int> counts = { "alice": 1 };
@@ -53,7 +53,7 @@ print(counts["alice"]);      // 2
 
 ## Map literals
 
-A map literal lists entries in braces, and the first key tells it apart from a record literal: a record field is named by a bare identifier, a map key is a *literal constant* — a string literal or a (possibly negated) number literal. `{}` is the empty map wherever a map type is expected, exactly as `[]` is the empty array:
+A map literal lists entries in braces. The first key tells a map literal from a record literal. A record field has a bare identifier as its name. A map key is a *literal constant*: a string literal or a number literal, which can be negative. `{}` is the empty map where a map type is expected, as `[]` is the empty array:
 
 ```nio
 Map<String, int> ages = { "alice": 31, "bob": 27 };
@@ -61,7 +61,7 @@ Map<int, String> codes = { 200: "ok", 404: "not found", -1: "minus" };
 Map<String, float> scores = {};
 ```
 
-The two brace literals nest without ambiguity — quoted keys mark map entries, bare names mark record fields:
+One kind of brace literal can be inside the other. Quoted keys mark map entries, and bare names mark record fields:
 
 ```nio
 type Car { String make; int age; }
@@ -81,7 +81,7 @@ print(fleet.length);            // 3
 
 ## Iterating
 
-Iteration goes through the keys, with the ordinary `forEach`:
+A `forEach` on the keys of a map iterates over the map:
 
 ```nio
 import 'map';
@@ -93,11 +93,11 @@ forEach(map.keys(ages), name) {
 }
 ```
 
-Iteration order is **insertion order** — the order entries were first inserted, an overwrite keeping the entry's place and a removed-then-reinserted key moving to the end. `map.keys`, `map.values`, and JSON serialization all follow it, so output is deterministic.
+Iteration order is **insertion order**: the order in which the entries were first inserted. An overwrite does not change the position of an entry. A key that is removed and then inserted again moves to the end. `map.keys`, `map.values` and JSON serialization all use this order. As a result, the output is always the same.
 
 ## Maps and JSON
 
-A `Map<String, V>` serializes to a JSON object and is the type for objects whose keys are *data* rather than declared fields — something a record cannot model:
+A `Map<String, V>` serializes to a JSON object. It is for objects whose keys are *data*, not declared fields. A record cannot hold such objects:
 
 ```nio
 import 'json';
@@ -114,6 +114,6 @@ if (byUser != null) {
 }
 ```
 
-JSON object keys are strings, so only String-keyed maps have a JSON form; see [JSON](/docs/stdlib/json).
+JSON object keys are strings. As a result, only maps with `String` keys have a JSON form. The [JSON](/docs/stdlib/json) page has the details.
 
-Maps cannot be compared with `==` or printed directly — serialize with `json.toText`, or check entries individually.
+Maps cannot be compared with `==` or printed directly. A program serializes a map with `json.toText`, or it checks the entries one by one.

@@ -36,18 +36,18 @@ A test file is an ordinary Nio program:
 nio run tests/math.nio
 ```
 
-`nio test` writes the entry file for you and runs every `*_test.nio` under a
-path — see [Testing](/docs/testing).
+`nio test` writes the entry file and runs each `*_test.nio` file under a path.
+[Testing](/docs/testing) gives more information.
 
 ## Notes
 
 * A test stops at its first failed assertion, but the remaining tests still run.
 * Any uncaught error inside a test is reported as a test failure.
 * `test.start` runs a synchronous test immediately. `test.startAsync` registers an async test that `test.run` waits for.
-* Always call `test.run` after registering tests. It prints the summary and exits with status `1` if any test failed.
+* A program must always call `test.run` after it registers its tests. It prints the summary and exits with status `1` if any test failed.
 <a id="filter"></a>
 
-**Running only some tests.** Every test program accepts `--filter <text>` and then runs only the tests whose title contains that text. This works whether `nio test` wrote the entry file or you did:
+**Running only some tests.** Each test program accepts `--filter <text>`. It then runs only the tests whose title contains that text. This works when `nio test` writes the entry file and when the entry file is written by hand:
 
 ```sh
 nio test --filter parser
@@ -55,7 +55,7 @@ nio run tests/all.nio --filter parser
 nio run tests/all.nio --filter="parser: a union"
 ```
 
-The text is matched as plain text, not as a pattern, so nothing needs escaping, and one filter can select a whole family of tests. The summary says how many tests were left out:
+The filter is plain text, not a pattern. Its characters need no escapes. One filter can select a group of tests. The summary shows how many tests were filtered out:
 
 ```text
 ok   parser: a union declares a sealed base
@@ -63,17 +63,17 @@ ok   parser: a union member takes one payload
 2 passed, 0 failed, 929 filtered out
 ```
 
-A test registered with `test.startAsync` is still started when it is filtered out — only its result is hidden — so filtering does not make async tests faster.
+A test registered with `test.startAsync` starts even when it is filtered out. Only its result is hidden. A filter does not make async tests faster.
 
 <a id="coverage"></a>
 
-**Coverage.** Run a test program with `--coverage` to see which lines of your code the tests ran:
+**Coverage.** A test program run with `--coverage` records which lines of the code the tests ran:
 
 ```sh
 nio run --coverage tests/math.nio
 ```
 
-This writes `coverage.lcov`, which most editors and coverage tools can display. Set `NIO_COVERAGE_FILE` to write it somewhere else.
+This writes `coverage.lcov`, which most editors and coverage tools can display. `NIO_COVERAGE_FILE` sets a different location for the file.
 
 ## `test.start()`
 
@@ -122,7 +122,7 @@ test.run();
 void test.assert(bool ok, String message)
 ```
 
-Fails the current test with `message` when `ok` is false. Use it for conditions that do not have a dedicated expectation.
+Fails the current test with `message` when `ok` is false. It is for conditions that do not have a dedicated expectation.
 
 ```nio
 import 'test';
@@ -156,7 +156,7 @@ test.start("answer is 42", void () -> {
 void test.expectFloat(float got, float want)
 ```
 
-Fails unless the values are exactly equal. Use it for values that are written directly rather than results that may contain floating-point rounding.
+Fails unless the values are equal. It is for values that are written directly, not for results that can contain floating-point rounding errors. `test.expectFloatNear` is for those results.
 
 ```nio
 import 'test';

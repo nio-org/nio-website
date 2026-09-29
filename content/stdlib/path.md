@@ -22,10 +22,10 @@ print(file);
 
 ## Notes
 
-* Both `/` and `\` are accepted as separators on every platform.
-* `join` and `localize` only work with path text. They do not check whether anything exists.
-* Use [`fs`](/docs/stdlib/fs) to read, write, inspect, or delete the path.
-* `userData` is the module's one fallible function; its failures carry `path.ErrorCode` codes (the same shared `ErrorCode` enum `fs` raises).
+* The module accepts `/` and `\` as separators on all platforms.
+* `join` and `localize` change only the path text. They do not check if an entry exists at the path.
+* The [`fs`](/docs/stdlib/fs) module reads, writes, inspects, or deletes the entry at the path.
+* `userData` is the only fallible function in the module. Its errors use `path.ErrorCode` codes. This is the same `ErrorCode` enum that `fs` uses.
 
 ## `path.getCwd()`
 
@@ -33,7 +33,7 @@ print(file);
 String path.getCwd()
 ```
 
-Returns the current working directory as an absolute path. Relative file-system paths are resolved from this directory.
+Returns the current working directory as an absolute path. Relative file-system paths start from this directory.
 
 If the working directory cannot be read, this function causes a runtime error.
 
@@ -49,9 +49,9 @@ print(path.getCwd());       // /Users/you/project
 String path.join(String first, ...String more)
 ```
 
-Joins one or more path parts using the platform's separator. It also removes repeated separators and `.` parts, and resolves `..` where possible.
+Joins one or more path parts with the separator of the platform and returns the result. It also removes repeated separators and `.` parts, and resolves `..` where possible.
 
-Empty parts are ignored. The result only ends in a separator when it is the root. Calling `path.join()` without any arguments is a compile error.
+The function ignores empty parts. The result ends in a separator only when it is the root. A call to `path.join()` with no arguments is a compile error.
 
 ```nio
 import 'path';
@@ -68,7 +68,7 @@ print(path.join("x", ".."));                     // .
 String path.localize(String p)
 ```
 
-Replaces every path separator with the platform's separator. Unlike `join`, it does not otherwise clean or resolve the path.
+Replaces each path separator with the separator of the platform and returns the result. It makes no other change to the path. It does not remove parts or resolve `..`, as `join` does.
 
 ```nio
 import 'path';
@@ -84,17 +84,17 @@ print(path.localize("../up"));       // .. is kept
 String path.userData(String app)
 ```
 
-Returns where the platform says an application named `app` should keep its data, with the app name as the last element:
+Returns the directory where the platform stores the data of an application named `app`. The app name is the last element of the path:
 
-| Platform | Answer |
+| Platform | Result |
 |---|---|
 | macOS | `$HOME/Library/Application Support/<app>` |
 | Windows | `%APPDATA%\<app>` |
 | Linux and others | `$XDG_DATA_HOME/<app>`, else `$HOME/.local/share/<app>` |
 
-It answers the path only — nothing is created. Use `fs.createDir` to make the directory the first time.
+The function returns only the path. It does not create the directory. `fs.createDir` makes the directory the first time.
 
-This is the module's one fallible function. If the environment does not say where the base location is (`HOME` unset), it raises `path.ErrorCode.NOT_FOUND`. The app name must be a single path element: an empty name, or one containing a separator, raises `path.ErrorCode.INVALID`.
+This is the only fallible function in the module. If the environment does not give the base location (for example, `HOME` is not set), it raises `path.ErrorCode.NOT_FOUND`. The app name must be one path element. An empty name, or a name that contains a separator, raises `path.ErrorCode.INVALID`.
 
 ```nio
 import 'path';

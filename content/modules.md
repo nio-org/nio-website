@@ -1,11 +1,11 @@
 ---
 title: "Modules, imports and exports"
-description: "Every Nio file is a module. Learn how to import other files, export declarations, re-export a module, and when a module initializes."
+description: "Every Nio file is a module. Imports, exports, re-exports, and when a module initializes."
 ---
 
 # Modules
 
-Every `.nio` file is a **module** with its own scope. Nothing in a file is visible to other files unless it is exported — two files can both declare an `int x` (or even both export one) without conflict.
+Every `.nio` file is a **module** with its own scope. A declaration in a file is not visible to other files unless it is exported. Two files can both declare an `int x`, or both export one, without conflict.
 
 ## Importing
 
@@ -18,15 +18,15 @@ import 'geo';                  // ./geo.nio, name "geo"
 import 'lib/helpers' as h;     // ./lib/helpers.nio, name "h"
 ```
 
-* File paths resolve relative to the importing file's directory; the `.nio` extension may be omitted.
-* `'time'`, `'json'`, `'array'`, `'string'`, `'map'`, `'async'`, `'os'`, `'path'`, `'fs'`, `'process'`, `'test'`, `'regexp'`, `'net'`, and `'http'` always name the built-in standard library modules. Use `'./time'` to import your own `time.nio`.
-* Without `as`, the module's name is the file's base name (`'lib/helpers'` → `helpers`). If that is not a valid identifier — `'string-utils'`, say — the import needs `as`.
-* A module name cannot be reused by anything else in the file, so it can never be shadowed. It is taken in *that* file only: a file that does not import `path` is free to call a variable `path`, and `import 'path' as p` frees the name here too. See [naming](/docs/basics#names-you-cannot-use).
+* File paths are relative to the folder of the importing file. The `.nio` extension is optional.
+* `'time'`, `'json'`, `'array'`, `'string'`, `'map'`, `'async'`, `'os'`, `'path'`, `'fs'`, `'process'`, `'regexp'`, `'net'`, `'crypto'`, `'math'`, `'random'`, `'test'`, `'http'`, `'tls'`, and `'x509'` always refer to the built-in standard library modules. A local file named `time.nio` is imported as `'./time'`.
+* Without `as`, the module name is the base name of the file (`'lib/helpers'` → `helpers`). If the base name is not a valid identifier, for example `'string-utils'`, the import must use `as`.
+* No other declaration in the file can use a module name. A module name cannot be shadowed. The name is reserved only in the file that imports the module. A file that does not import `path` can use `path` as a variable name. After `import 'path' as p`, the name `path` is also available in that file. [Naming](/docs/basics#reserved-names) gives the rules.
 * Import cycles are compile errors.
 
 ## Exporting
 
-Mark a top-level declaration with `export` to share it:
+`export` on a top-level declaration makes it visible to other files:
 
 ```nio
 // geo.nio
@@ -44,7 +44,7 @@ export Point makePoint(int x, int y) {
 void internalHelper() {}            // not exported: invisible to importers
 ```
 
-Importers reach exports through the module name:
+Importers use exports through the module name:
 
 ```nio
 // main.nio
@@ -58,7 +58,7 @@ g.Quadrant q = g.Quadrant.FIRST;   // enum members through the module name
 print(q);                          // FIRST
 ```
 
-An exported variable declared `const` is readable but not assignable, from importers and from the defining module alike:
+An exported variable declared `const` can be read but not assigned, by importers and by the module that declares it:
 
 ```nio
 // config.nio
@@ -70,9 +70,9 @@ print(cfg.maxRetries);             // 3
 cfg.maxRetries = 5;                // compile error: it is declared const
 ```
 
-An exported record or enum type is the *same* type everywhere it goes — a `geo.Point` returned by one module and consumed by another is one type, while another module's own `type Point` remains distinct.
+An exported record or enum type is the *same* type in every module that uses it. A `geo.Point` that one module returns and another module receives is one type. A `type Point` that a different module declares is a different type.
 
-A type's [methods](/docs/basics#methods) travel with it. They need no `export` of their own, and importers call them on the value rather than through the alias:
+The [methods](/docs/basics#methods) of a type are exported with the type. They need no `export` of their own. Importers call them on the value, not through the alias:
 
 ```nio
 // geo.nio
@@ -89,13 +89,13 @@ g.Point p = { x: 3, y: 4 };
 print(p.manhattan());            // 7
 ```
 
-An exported type can also be [extended](/docs/basics#extending-a-type): `type Segment extends g.Point { ... }` copies its fields and methods into a type of your own. The copied bodies keep resolving their names in the module that wrote them, so they still reach that module's private functions, variables and imports — nothing has to be exported for its own sake, and the extending file needs none of those imports.
+An exported type can also be [extended](/docs/basics#extending-a-type). `type Segment extends g.Point { ... }` copies its fields and methods into a new type of the importing module. The copied method bodies resolve names in the module that declares the base type. As a result, they can use the private functions, variables and imports of that module. That module does not have to export them, and the extending file does not need those imports.
 
-Built-in modules work the same way where they have a type to name. [`os.Cpu`](/docs/stdlib/os#types), `fs.Stat`, `fs.DeleteOptions`, `process.ChildRunResult`, and `process.ChildRunOptions` are the five, and because each is reached through its module name, `Cpu`, `Stat`, `DeleteOptions`, `ChildRunResult`, and `ChildRunOptions` stay available for types of your own. None of them can be extended: the compiler declares them, and there is no body to copy.
+Built-in modules that declare record types work the same way. The record types are [`os.Cpu`](/docs/stdlib/os#types), `fs.Stat`, `fs.DeleteOptions`, `process.ChildRunResult`, `process.ChildRunOptions`, `process.ChildUsage`, `net.Options`, and `net.Datagram`. A program uses each one through its module name. A program can declare its own types named `Cpu`, `Stat`, `Options`, and `Datagram`. These types cannot be extended, because the compiler declares them.
 
 ## Re-exporting
 
-A module is one file, so a library of any size is several. `export` on an import alias republishes everything that module exports as part of your own module, which lets a group of files present a single one to whoever imports them:
+`export` on an import alias republishes all the exports of that module as part of the module that contains the `export`. This lets a group of files present one module to its importers:
 
 ```nio
 // x509/lib.nio -- what importers see
@@ -115,16 +115,16 @@ import 'x509/lib' as x509;
 x509.Certificate c = x509.parse(bytes);
 ```
 
-There are three forms. `export der;` publishes everything `der` exports, `export der show A, B;` publishes only what it names, and `export der hide C;` publishes everything else. `show` and `hide` are ordinary words, not keywords, so you can still name a variable `show`.
+There are three forms. `export der;` publishes all the exports of `der`. `export der show A, B;` publishes only the names in the list. `export der hide C;` publishes all names except those in the list. `show` and `hide` are not keywords. A variable can have the name `show`.
 
-Four things are worth knowing:
+Re-exports have these properties:
 
-- **It names an alias, not a path.** The path is written once, in the import. A re-export therefore adds no dependency, and can never create an import cycle that your imports do not already have.
-- **It publishes names and brings none into scope.** If `lib.nio` also *calls* into `der.nio`, it uses the alias its import bound, exactly as before. The re-export changes only what importers of `lib.nio` see.
-- **A republished type is the same type.** Re-exporting rebinds a name; it does not copy a declaration. A value made through `der.Tlv` passes freely where an `x509.Tlv` is wanted, because there is only one `Tlv`.
-- **It carries through a chain.** If `mid` republishes `prim` and `top` republishes `mid`, then `top` publishes `prim`'s names too.
+- **It names an alias, not a path.** The path is written once, in the import. As a result, a re-export adds no dependency. It cannot create an import cycle that the imports of the file do not already have.
+- **It publishes names but does not bring them into scope.** If `lib.nio` also calls functions in `der.nio`, it uses the alias from its import. The re-export changes only what importers of `lib.nio` see.
+- **A republished type is the same type.** A re-export adds a name for a declaration. It does not copy the declaration. A value made through `der.Tlv` is valid where an `x509.Tlv` is expected, because there is only one `Tlv`.
+- **It applies through a chain.** If `mid` republishes `prim` and `top` republishes `mid`, then `top` also publishes the names of `prim`.
 
-The pattern this exists for is a **private part**: a file exports something so its neighbours can use it, and the file importers use publishes only the part meant for the outside.
+A re-export keeps a **private part** in a library. A file exports a declaration for the other files of the library. The file that importers use publishes only the declarations for external use.
 
 ```nio
 // der.nio
@@ -137,7 +137,7 @@ export type Certificate { ... }         // the world needs it
 export der show Certificate;            // readLength stays inside
 ```
 
-Because what a module publishes is assembled rather than written out, `nio doc` prints what each re-export actually publishes — which is how you notice a part gaining an export that you did not mean to make public:
+`nio doc` prints the names that each re-export publishes. This shows an export that was not intended to be public:
 
 ```text
 $ nio doc x509/lib.nio
@@ -146,11 +146,11 @@ export der show Tlv, Der, Certificate
     republished from der: Tlv, Der, Certificate
 ```
 
-Publishing one name twice is an error, whether it comes from two re-exports or from a re-export and a declaration of your own. The compiler names both places and points at `show` or `hide` as the way to say which one you meant.
+It is an error to publish one name two times, from two re-exports or from a re-export and a declaration of the same module. The error shows both locations. `show` or `hide` selects the name to publish.
 
 ## Initialization
 
-A module's top-level statements run exactly once, before any file that imports it; the entry file's top-level code runs last. A module imported by several files is still initialized only once.
+The top-level statements of a module run once, before the code of any file that imports it. The top-level code of the entry file runs last. A module that several files import is also initialized only once.
 
 ```nio
 // base.nio

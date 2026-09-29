@@ -11,7 +11,7 @@ description: "The Nio crypto module: SHA-256 and SHA-384, HMAC, HKDF, authentica
 import 'crypto';
 ```
 
-The `crypto` module holds the building blocks of secure software: hashing (SHA-256 and SHA-384), message authentication (HMAC), key derivation (HKDF), encryption (ChaCha20-Poly1305 and AES-128-GCM), key agreement (X25519), checking RSA and ECDSA signatures, base64 and hex encoding, and secure random bytes from the operating system.
+The `crypto` module contains functions for hashing (SHA-256 and SHA-384), message authentication (HMAC), key derivation (HKDF), encryption (ChaCha20-Poly1305 and AES-128-GCM), key agreement (X25519), RSA and ECDSA signature verification, base64 and hex encoding, and secure random bytes from the operating system.
 
 ```nio
 import 'crypto';
@@ -28,28 +28,28 @@ print(crypto.base64Encode(mac));
 
 ## Notes
 
-* Everything works on `byte[]`. Hash a string by converting it first with
-  `string.toByteArray`.
-* The hash is part of each function's name (`sha256`, `sha384`), so a wrong
-  algorithm name is a compile error, never a runtime surprise.
-* **Never compare secrets with `==`** — it stops at the first differing
-  byte, which leaks where the difference is to anyone who can time it.
-  Compare a MAC, token, or tag with `string.bytesEqualConstantTime` or
-  `string.equalsConstantTime`.
-* `base64Decode` and `hexDecode` are fallible: text that does not decode
-  raises an error with the code `crypto.ErrorCode.INVALID`, which `catch`
-  handles like any other (see [Errors](/docs/errors)).
-* The decoders are strict: no whitespace, exact padding, no trailing bits.
-  Strip newlines yourself before decoding wrapped base64 (such as PEM
-  contents).
-* `randomBytes` is the operating system's generator. It cannot be
-  configured or seeded, and the module offers no other randomness.
-* Keys, nonces and curve points have fixed lengths (32 bytes, except the
-  AEAD nonce at 12). Passing a different length stops the program — it is a
-  bug, not bad input.
-* **There is no signing here, and none is planned.** Signing is the most
-  side-channel-fragile operation in a TLS stack, so this one simply does not
-  contain it. The RSA and ECDSA functions verify only.
+* All functions operate on `byte[]`. A string is converted with
+  `string.toByteArray` before it is hashed.
+* The hash is part of each function's name (`sha256`, `sha384`). As a result, a
+  wrong algorithm name is a compile error.
+* **Do not compare secrets with `==`.** It stops at the first byte that is
+  different. An attacker who can measure the time can find where the
+  difference is. To compare a MAC, token or tag, use
+  `string.bytesEqualConstantTime` or `string.equalsConstantTime`. They
+  compare in constant time.
+* `base64Decode` and `hexDecode` are fallible. Text that does not decode
+  raises an error with the code `crypto.ErrorCode.INVALID`. A `catch`
+  handles the error (see [Errors](/docs/errors)).
+* The decoders are strict. They accept no whitespace, require exact padding
+  and allow no trailing bits. Wrapped base64, such as PEM contents, does
+  not decode until its newlines are removed.
+* `randomBytes` uses the operating system's generator. A program cannot
+  configure or seed it. The module has no other source of random data.
+* Keys, nonces and curve points have fixed lengths: 32 bytes, except the
+  AEAD nonce (12 bytes) and the AES-128-GCM key (16 bytes). A different
+  length stops the program, because it is a program error, not bad input.
+* **The module does not sign.** The RSA and ECDSA functions only verify
+  signatures.
 
 ## `crypto.sha256()`
 
@@ -57,7 +57,7 @@ print(crypto.base64Encode(mac));
 byte[] crypto.sha256(byte[] data)
 ```
 
-The SHA-256 digest of `data`: 32 bytes.
+Returns the SHA-256 digest of `data`: 32 bytes.
 
 ```nio
 import 'crypto';
@@ -73,7 +73,7 @@ print(crypto.hexEncode(crypto.sha256(string.toByteArray(""))));
 byte[] crypto.sha384(byte[] data)
 ```
 
-The SHA-384 digest of `data`: 48 bytes.
+Returns the SHA-384 digest of `data`: 48 bytes.
 
 ```nio
 import 'crypto';
@@ -88,9 +88,10 @@ print(crypto.sha384(string.toByteArray("")).length);   // 48
 byte[] crypto.hmacSha256(byte[] key, byte[] data)
 ```
 
-The HMAC-SHA-256 of `data` under `key` (RFC 2104): 32 bytes. Use it to
-authenticate a message with a shared secret; verify by recomputing and
-comparing with `string.bytesEqualConstantTime`.
+Returns the HMAC-SHA-256 of `data` under `key` (RFC 2104): 32 bytes. It
+authenticates a message with a shared secret. To verify a message, the
+receiver calculates the HMAC again and compares the two values with
+`string.bytesEqualConstantTime`.
 
 ```nio
 import 'crypto';
@@ -111,8 +112,8 @@ print(string.bytesEqualConstantTime(tag, again));   // true
 byte[] crypto.hmacSha384(byte[] key, byte[] data)
 ```
 
-The HMAC-SHA-384 of `data` under `key` (RFC 2104): 48 bytes. Use and verify
-it the same way as [`hmacSha256`](#cryptohmacsha256).
+Returns the HMAC-SHA-384 of `data` under `key` (RFC 2104): 48 bytes. It is
+used and verified in the same way as [`hmacSha256`](#cryptohmacsha256).
 
 ```nio
 import 'crypto';
@@ -129,11 +130,11 @@ print(tag.length);   // 48
 byte[] crypto.hkdfExtractSha256(byte[] salt, byte[] ikm)
 ```
 
-HKDF (RFC 5869) is the standard way to turn one secret into as many
-independent keys as needed, in two steps. `hkdfExtractSha256` is the first:
-it condenses input key material into a pseudorandom key.
-[`hkdfExpandSha256`](#cryptohkdfexpandsha256) is the second. Both exist in
-SHA-384 form as `hkdfExtractSha384` and `hkdfExpandSha384`.
+HKDF (RFC 5869) derives any number of independent keys from one secret, in
+two steps. `hkdfExtractSha256` is the first step. It condenses input key
+material into a pseudorandom key.
+[`hkdfExpandSha256`](#cryptohkdfexpandsha256) is the second step. Both steps
+also exist for SHA-384, as `hkdfExtractSha384` and `hkdfExpandSha384`.
 
 An empty `salt` means "no salt", as the RFC defines it.
 
@@ -152,9 +153,9 @@ print(prk.length);   // 32
 byte[] crypto.hkdfExpandSha256(byte[] prk, byte[] info, int length)
 ```
 
-The second step of HKDF. It stretches the pseudorandom key from
+The second step of HKDF. It expands the pseudorandom key from
 [`hkdfExtractSha256`](#cryptohkdfextractsha256) into `length` bytes, bound to
-a context string `info`, so different contexts get unrelated keys. The
+the context string `info`. Different contexts give unrelated keys. The
 SHA-384 form is `hkdfExpandSha384`.
 
 ```nio
@@ -167,8 +168,8 @@ byte[] encKey = crypto.hkdfExpandSha256(prk, string.toByteArray("enc"), 32);
 byte[] macKey = crypto.hkdfExpandSha256(prk, string.toByteArray("mac"), 32);
 ```
 
-`length` may not exceed 255 times the hash length (8160 bytes for SHA-256);
-asking for more stops the program.
+`length` must not be more than 255 times the hash length (8160 bytes for
+SHA-256). A larger value stops the program.
 
 ## `crypto.chacha20Poly1305Seal()`
 
@@ -176,14 +177,14 @@ asking for more stops the program.
 byte[] crypto.chacha20Poly1305Seal(byte[] key, byte[] nonce, byte[] plaintext, byte[] aad)
 ```
 
-Authenticated encryption (RFC 8439). `key` is 32 bytes, `nonce` is 12.
-`Seal` returns the ciphertext with a 16-byte authentication tag appended;
-[`chacha20Poly1305Open`](#cryptochacha20poly1305open) verifies that tag and
-returns the plaintext.
+Authenticated encryption (RFC 8439). `key` is 32 bytes and `nonce` is 12
+bytes. `Seal` returns the ciphertext with a 16-byte authentication tag
+appended. [`chacha20Poly1305Open`](#cryptochacha20poly1305open) verifies the
+tag and returns the plaintext.
 
-`aad` ("additional authenticated data") is data that travels in the clear but
-must not be alterable — a message header, a type byte, a sequence number.
-Pass an empty array if there is none.
+`aad` (additional authenticated data) is data that is sent unencrypted but is
+protected against changes, for example a message header, a type byte or a
+sequence number. When there is no such data, `aad` is an empty array.
 
 ```nio
 import 'crypto';
@@ -197,13 +198,13 @@ byte[] sealed = crypto.chacha20Poly1305Seal(key, nonce,
 print(sealed.length);   // 30: 14 bytes of ciphertext and the 16-byte tag
 ```
 
-**Never reuse a nonce with the same key.** Doing so destroys the secrecy of
-both messages and leaks the authentication key, letting an attacker forge
-freely. Either keep a per-key counter, or generate 12 fresh random bytes for
-every message and transmit them next to the ciphertext (they are not
-secret).
+**Do not use a nonce two times with the same key.** Both messages
+lose their secrecy and the authentication key is disclosed. An attacker can
+then forge messages. To prevent a repeated nonce, use a counter for each key,
+or 12 new random bytes for each message, sent with the ciphertext.
+Nonces are not secret.
 
-ChaCha20-Poly1305 works on every processor at full safety, which makes it the default choice. [AES-128-GCM](#cryptoaes128gcmseal) is also available, but only on processors with AES instructions.
+ChaCha20-Poly1305 is safe on all processors. It is the default choice. [AES-128-GCM](#cryptoaes128gcmseal) is also available, but only on processors with AES instructions.
 
 ## `crypto.chacha20Poly1305Open()`
 
@@ -213,8 +214,8 @@ byte[]! crypto.chacha20Poly1305Open(byte[] key, byte[] nonce, byte[] ciphertext,
 
 Verifies the tag on a message from
 [`chacha20Poly1305Seal`](#cryptochacha20poly1305seal) and returns the
-plaintext, or fails. Pass the same key, nonce and `aad` the message was
-sealed with.
+plaintext, or fails. The key, nonce and `aad` must be the same as the ones
+that sealed the message.
 
 ```nio
 import 'crypto';
@@ -235,10 +236,12 @@ if (plain != null) {
 }
 ```
 
-Failure carries `crypto.ErrorCode.AUTHENTICATION` rather than `INVALID`: the
-message was readable and *is a forgery*, which usually means dropping the
-connection rather than retrying. `Open` verifies before it decrypts, so a
-failed call never yields partial plaintext.
+A failed tag check fails with `crypto.ErrorCode.AUTHENTICATION`. It means
+that the message was forged or changed. It is different from `INVALID`,
+which means that the input is malformed. The usual response to
+`AUTHENTICATION` is to close the connection, not to try again. `Open`
+verifies the tag before it decrypts. As a result, a failed call returns no
+plaintext.
 
 ## `crypto.x25519PublicKey()`
 
@@ -247,9 +250,9 @@ byte[] crypto.x25519PublicKey(byte[] privateKey)
 ```
 
 X25519 Diffie-Hellman key agreement (RFC 7748). A private key is 32 random
-bytes; the required bit-clamping happens inside. `x25519PublicKey` answers
-the public key that goes with a private key. Two parties who exchange
-public keys arrive at the same 32-byte shared secret with
+bytes. The function applies the required bit clamping. `x25519PublicKey`
+returns the public key for a private key. When two parties exchange public
+keys, each one calculates the same 32-byte shared secret with
 [`x25519SharedSecret`](#cryptox25519sharedsecret).
 
 ```nio
@@ -260,17 +263,15 @@ byte[] publicKey = crypto.x25519PublicKey(privateKey);   // send this to the pee
 print(publicKey.length);   // 32
 ```
 
-The curve arithmetic is fiat-crypto's formally verified code, used unmodified.
-
 ## `crypto.x25519SharedSecret()`
 
 ```nio
 byte[]! crypto.x25519SharedSecret(byte[] privateKey, byte[] peerPublicKey)
 ```
 
-The 32-byte shared secret from your own private key and the peer's public
-key (see [`x25519PublicKey`](#cryptox25519publickey)). Both parties compute
-the same value.
+Returns the 32-byte shared secret from the caller's private key and the peer's
+public key (see [`x25519PublicKey`](#cryptox25519publickey)). Both parties
+calculate the same value.
 
 ```nio
 import 'crypto';
@@ -294,7 +295,7 @@ if (aliceSecret != null && bobSecret != null) {
 }
 ```
 
-**Do not use the shared secret as a key directly.** It is not evenly random. Turn it into keys with HKDF:
+**Do not use the shared secret directly as a key.** Its bits are not uniformly random. Derive keys from it with HKDF:
 
 ```nio
 import 'crypto';
@@ -306,10 +307,10 @@ byte[] deriveSessionKey(byte[] shared) {
 }
 ```
 
-`x25519SharedSecret` fails when the peer's public key has small order — a
-key chosen to force the shared secret to a value the peer picked, which
-would make the "agreement" meaningless. Rejecting it is mandatory for TLS
-1.3, and this function is fallible so that the check cannot be skipped.
+`x25519SharedSecret` fails with `crypto.ErrorCode.INVALID` when the peer's
+public key has small order. Such a key forces the shared secret to a value
+that the peer selects. TLS 1.3 requires this check. Because the function is
+fallible, the caller cannot skip the check.
 
 ## `crypto.base64Encode()`
 
@@ -317,7 +318,7 @@ would make the "agreement" meaningless. Rejecting it is mandatory for TLS
 String crypto.base64Encode(byte[] data)
 ```
 
-Standard base64 (RFC 4648 §4), with padding.
+Encodes `data` as standard base64 (RFC 4648 §4), with padding.
 
 ```nio
 import 'crypto';
@@ -332,9 +333,9 @@ print(crypto.base64Encode(string.toByteArray("foobar")));   // Zm9vYmFy
 byte[]! crypto.base64Decode(String s)
 ```
 
-Decodes standard base64 (RFC 4648 §4), with padding. Decoding is strict —
-the standard alphabet only, correct padding, no whitespace — and fails with
-`crypto.ErrorCode.INVALID` on anything else.
+Decodes standard base64 (RFC 4648 §4), with padding. Decoding is strict. It
+accepts only the standard alphabet, with correct padding and no whitespace.
+All other input fails with `crypto.ErrorCode.INVALID`.
 
 ```nio
 import 'crypto';
@@ -354,7 +355,7 @@ if (decoded != null) {
 String crypto.hexEncode(byte[] data)
 ```
 
-Hex encoding: two characters per byte, in lower case.
+Encodes `data` as hex: two lower-case characters for each byte.
 
 ```nio
 import 'crypto';
@@ -369,9 +370,9 @@ print(crypto.hexEncode(string.toByteArray("Hi!")));   // 486921
 byte[]! crypto.hexDecode(String s)
 ```
 
-Decodes hex, two characters per byte. It accepts either case, and fails
-with `crypto.ErrorCode.INVALID` on an odd length or a character that is not
-a hex digit.
+Decodes hex, two characters for each byte. It accepts upper and lower case.
+It fails with `crypto.ErrorCode.INVALID` on an odd length or on a character
+that is not a hex digit.
 
 ```nio
 import 'crypto';
@@ -391,11 +392,10 @@ if (decoded != null) {
 byte[] crypto.randomBytes(int n)
 ```
 
-`n` cryptographically secure random bytes from the operating system
+Returns `n` cryptographically secure random bytes from the operating system
 (`getentropy` on macOS, `getrandom` on Linux, `BCryptGenRandom` on Windows).
-Suitable for keys, tokens, and nonces. If the system generator fails — which
-does not happen on a working machine — the program stops; there is no weaker
-fallback.
+They are suitable for keys, tokens and nonces. If the system generator fails, the
+program stops. There is no weaker fallback.
 
 ## `crypto.rsaVerifyPkcs1v15()`
 
@@ -404,13 +404,12 @@ void! crypto.rsaVerifyPkcs1v15(byte[] modulus, int exponent, String hash,
                                byte[] digest, byte[] signature)
 ```
 
-Checks an RSA PKCS #1 v1.5 signature over an already-computed digest.
-`hash` names the digest that produced it — `"sha256"` or `"sha384"` — and
-`modulus` is the key's modulus without a leading zero byte.
+Verifies an RSA PKCS #1 v1.5 signature over a digest that is already
+calculated. `hash` names the hash function that made the digest: `"sha256"`
+or `"sha384"`. `modulus` is the key's modulus without a leading zero byte.
 
-**It answers nothing and fails instead.** A verifier that returned a `bool`
-would eventually have a caller who forgot to test it, and that is a whole
-family of real vulnerabilities. One that raises cannot be ignored:
+**The function returns no value.** It raises an error when the signature
+does not verify. As a result, the caller cannot ignore a failed verification:
 
 ```nio
 import 'crypto';
@@ -424,17 +423,15 @@ void check(byte[] modulus, byte[] message, byte[] signature) {
 }
 ```
 
-The two failures are told apart, and it matters:
+The error code identifies the type of failure:
 
 | Code | Means |
 |---|---|
-| `crypto.ErrorCode.INVALID` | The key or signature cannot be used at all — a modulus under 1024 bits or over 8192, an even modulus, an even exponent or one outside 3…2³¹−1, a digest of the wrong length for the named hash, a signature that is not exactly as long as the modulus, or one not below it. |
-| `crypto.ErrorCode.AUTHENTICATION` | Everything was well-formed and the signature does not verify. |
+| `crypto.ErrorCode.INVALID` | The key or the signature is not usable: a modulus under 1024 bits or over 8192 bits, an even modulus, an even exponent or an exponent outside 3…2³¹−1, a digest of the wrong length for the named hash, a signature that is not the same length as the modulus, or a signature that is not less than the modulus. |
+| `crypto.ErrorCode.AUTHENTICATION` | The key and the signature are well formed, but the signature does not verify. |
 
-SHA-1 and MD5 are not accepted as hash names. Chosen-prefix collisions
-against SHA-1 are practical, so a signature over one means nothing.
-
-This function and [`rsaVerifyPss`](#cryptorsaverifypss) are tested against Google's Wycheproof collection of known-tricky signatures. Only public values are involved, so neither function needs to guard against timing attacks.
+SHA-1 and MD5 are not accepted as hash names, because chosen-prefix
+collision attacks against SHA-1 are practical.
 
 ## `crypto.rsaVerifyPss()`
 
@@ -443,13 +440,13 @@ void! crypto.rsaVerifyPss(byte[] modulus, int exponent, String hash,
                           byte[] digest, byte[] signature)
 ```
 
-Checks an RSA-PSS signature over an already-computed digest. The arguments,
-the accepted hash names, and the two failure codes are the same as for
-[`rsaVerifyPkcs1v15`](#cryptorsaverifypkcs1v15), and it also answers nothing
-and fails instead.
+Verifies an RSA-PSS signature over a digest that is already calculated. The
+arguments, the accepted hash names and the two error codes are the same as
+for [`rsaVerifyPkcs1v15`](#cryptorsaverifypkcs1v15). It also returns no value
+and raises an error on failure.
 
-`rsaVerifyPss` expects the profile TLS 1.3 uses: MGF1 with the same hash, and
-a salt length equal to the hash length.
+`rsaVerifyPss` expects the TLS 1.3 profile: MGF1 with the same hash, and a
+salt length equal to the hash length.
 
 ```nio
 import 'crypto';
@@ -469,13 +466,13 @@ void check(byte[] modulus, byte[] message, byte[] signature) {
 byte[]! crypto.aes128GcmSeal(byte[] key, byte[] nonce, byte[] plaintext, byte[] aad)
 ```
 
-AES-128-GCM, the other AEAD TLS 1.3 uses. A 16-byte key, a 12-byte nonce, and the 16-byte tag appended to the ciphertext — the same shape as [`chacha20Poly1305Seal`](#cryptochacha20poly1305seal), so the two are interchangeable to a caller that holds either. [`aes128GcmOpen`](#cryptoaes128gcmopen) verifies the tag and returns the plaintext.
+AES-128-GCM is the second AEAD cipher that TLS 1.3 uses. The key is 16 bytes and the nonce is 12 bytes. The 16-byte tag is appended to the ciphertext. The format is the same as for [`chacha20Poly1305Seal`](#cryptochacha20poly1305seal). A caller can use the two ciphers in the same way. [`aes128GcmOpen`](#cryptoaes128gcmopen) verifies the tag and returns the plaintext.
 
 > [!WARNING]
 >
-> **This cipher exists only where the CPU can run it in constant time**, and both functions — seal included, unlike the ChaCha pair — fail when it cannot. Ask [`crypto.aesGcmAvailable()`](#cryptoaesgcmavailable) first if you need to know before committing.
+> **AES-128-GCM is available only on processors with AES instructions.** On other processors, both functions fail, including `aes128GcmSeal`. The ChaCha20-Poly1305 seal function does not fail. Call [`crypto.aesGcmAvailable()`](#cryptoaesgcmavailable) to check the processor before use.
 >
-> There is no software fallback, and that is the point. A software AES is either a table indexed by key-derived bytes — a cache-timing oracle, and the most exploited implementation flaw the cipher has — or a bitsliced implementation, which is a project of its own. Refusing is the honest third option.
+> There is no software implementation of AES.
 
 ```nio
 import 'crypto';
@@ -494,9 +491,7 @@ void sealOne() {
 }
 ```
 
-**A nonce may never repeat under one key** — the same rule, and the same consequences, as the ChaCha AEAD above. GCM is if anything less forgiving: repeating a nonce leaks the GHASH authentication key, after which an attacker can forge any message.
-
-Everything is done with the processor's own AES instructions, and the implementation is tested against Google's Wycheproof vectors and against OpenSSL on both arm64 and x86-64.
+**Do not use a nonce two times with the same key.** The rule and the consequences are the same as for ChaCha20-Poly1305. With GCM, a repeated nonce discloses the GHASH authentication key, and an attacker can then forge any message.
 
 ## `crypto.aes128GcmOpen()`
 
@@ -505,8 +500,8 @@ byte[]! crypto.aes128GcmOpen(byte[] key, byte[] nonce, byte[] ciphertext, byte[]
 ```
 
 Verifies the tag on a message from [`aes128GcmSeal`](#cryptoaes128gcmseal)
-and returns the plaintext, or fails. The sizes and the CPU requirement are
-the same as for `aes128GcmSeal`. A forged or corrupted message fails with
+and returns the plaintext, or fails. The sizes and the processor requirement
+are the same as for `aes128GcmSeal`. A forged or changed message fails with
 `crypto.ErrorCode.AUTHENTICATION`.
 
 ```nio
@@ -536,10 +531,10 @@ void roundTrip() {
 bool crypto.aesGcmAvailable()
 ```
 
-Whether this processor can run AES-128-GCM, that is, whether
+Returns `true` if this processor can run AES-128-GCM, that is, if
 [`aes128GcmSeal`](#cryptoaes128gcmseal) and
-[`aes128GcmOpen`](#cryptoaes128gcmopen) work here. Ask it first if you need
-to know before committing.
+[`aes128GcmOpen`](#cryptoaes128gcmopen) work on it. A program must check it before
+it uses those functions.
 
 ```nio
 import 'crypto';
@@ -558,14 +553,13 @@ void! crypto.ecdsaVerify(String curve, byte[] publicKey, byte[] digest,
                          byte[] r, byte[] s)
 ```
 
-The same contract for ECDSA over the two NIST curves the web serves.
-`curve` is `"p256"` or `"p384"` — named rather than inferred from the key's
-length, so a mistake is a loud `INVALID` rather than a quiet guess.
-`publicKey` is the SEC 1 uncompressed point (`0x04 ‖ X ‖ Y`, the only form
-certificates carry), and `r` and `s` are the signature's two integers as
-big-endian bytes — already out of their DER, which is
-[`x509.parseEcdsaSignature`](/docs/stdlib/x509)'s job, because ASN.1 parsing does not
-belong in C.
+Verifies an ECDSA signature on the P-256 or P-384 curve. Like the RSA
+functions, it returns no value and raises an error on failure. `curve` is
+`"p256"` or `"p384"`. The function does not infer the curve from the key
+length. `publicKey` is the SEC 1 uncompressed point (`0x04 ‖ X ‖ Y`), which
+is the only form that certificates contain. `r` and `s` are the two integers
+of the signature as big-endian bytes, already decoded from DER.
+[`x509.parseEcdsaSignature`](/docs/stdlib/x509) decodes them.
 
 ```nio
 import 'crypto';
@@ -581,10 +575,9 @@ void check(byte[] publicKey, byte[] message, byte[] derSignature) {
 }
 ```
 
-The failure split is [the RSA one](#cryptorsaverifypkcs1v15): a key that is not an uncompressed point
-on the named curve, or an `r` or `s` outside 1…n−1, is `INVALID`; a
-well-formed signature that does not verify is `AUTHENTICATION`. A digest
-longer than the curve's order is truncated to its leftmost bytes, which is
-what FIPS 186-5 says and what lets a SHA-384 signature ride a P-256 key.
-
-The arithmetic underneath is fiat-crypto's formally verified code, and the function is tested against Google's Wycheproof vectors for both curves.
+The error codes are the same as for [the RSA functions](#cryptorsaverifypkcs1v15). A key that is not an uncompressed point
+on the named curve, or an `r` or `s` outside 1…n−1, fails with `INVALID`. A
+well-formed signature that does not verify fails with `AUTHENTICATION`. A
+digest longer than the curve's order is truncated to its leftmost bytes, as
+FIPS 186-5 specifies. As a result, a P-256 key can verify a SHA-384
+signature.

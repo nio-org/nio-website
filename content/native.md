@@ -1,18 +1,17 @@
 ---
 title: "Calling C from Nio"
-description: "Bind functions written in C or Objective-C to Nio with extern declarations, ship the C source with your module, and add linker flags."
+description: "Bind functions written in C or Objective-C to Nio with extern declarations, ship the C source with a module, and add linker flags."
 ---
 
 # Native interop
 
-A module can bind functions written in C — or Objective-C — and link the
-files that define them into the program. This is the mechanism libraries use
-to reach what the built-in modules do not cover: a windowing system, a
-database's client library, a hardware sensor. Nothing about it touches the
-compiler's own tables; a library that binds C is still an ordinary file
-reached by an ordinary import.
+A module can bind functions written in C or Objective-C, and link the files
+that define them into the program. Libraries use this to get access to
+features that the built-in modules do not supply, for example a windowing
+system, the client library of a database, or a hardware sensor. A library that
+binds C is an ordinary file. A program uses it with an ordinary import.
 
-Three statements carry the whole feature:
+The feature uses three statements:
 
 ```nio
 native source './adder.c';
@@ -23,17 +22,18 @@ extern int add(int a, int b);
 print(add(2, 40));             // 42
 ```
 
-None of the three words is a keyword. Like `sealed` and `union`, they are
-recognized by position, so `int extern = 3;` still declares a variable and
-`native` still names one.
+None of the three words is a keyword. As with `sealed` and `union`, the
+compiler recognizes them by their position. As a result, `int extern = 3;`
+still declares a variable, and a variable can have the name `native`.
 
 ## extern declarations
 
-`extern` declares a function whose definition lives in a native source: a
-function declaration with no body, ended by `;`. The name is the C symbol,
-exactly as written — no module prefix — so it must be unique across the
-whole program the way any C symbol is. Two modules may both declare the same
-symbol, and then their signatures must agree; the compiler holds them to it.
+`extern` declares a function that a native source defines. It is a function
+declaration with no body, followed by `;`. The name is the C symbol as
+written, with no module prefix. As a result, the name must be unique in all the
+modules of the program, as every C symbol must be. Two modules can declare the same symbol,
+but then their signatures must be the same. The compiler reports an error if
+they are different.
 
 ```nio
 extern int add(int a, int b);
@@ -41,22 +41,21 @@ extern String greet(String name);
 extern float mean(float[] xs);
 ```
 
-An extern function is called like any other function in its module. What it
-cannot do:
+Code in its module calls an extern function like any other function. An extern
+function cannot:
 
-- **Be exported.** A library wraps its externs in ordinary Nio functions —
-  which is also where raising, records and optionals belong, since none of
-  those cross the boundary.
-- **Be async, variadic, or fallible.** It has no body to suspend or raise
-  from. A C function reports failure in its return value, and the wrapper
-  turns that into an `Error` (see the pattern below).
-- **Use a name every program already links**: names beginning `rt_`, and
-  `main`, are rejected.
+- **Be exported.** A library wraps its externs in ordinary Nio functions.
+  Errors, records and optionals do not cross to C. The wrapper must handle
+  them.
+- **Be async, variadic, or fallible.** It has no body that can suspend or
+  raise an error. A C function reports failure in its return value, and the
+  wrapper converts that value into an `Error` (the pattern below shows this).
+- **Use a name that every program already links.** The compiler rejects names
+  that start with `rt_`, and the name `main`.
 
 ### What crosses
 
-The types allowed in an extern signature are the ones whose in-register unit
-C can hold directly:
+An extern signature can use only these types:
 
 | Nio type | C side |
 |---|---|
@@ -66,24 +65,25 @@ C can hold directly:
 | arrays of any of the above | `Arr *` (runtime.h) |
 | `void` | return only |
 
-Records, optionals, maps, function values and futures stay on the Nio side;
-the wrapper converts. The narrow integer types arrive in range but not
-narrowed — an `int8` parameter is an `int64_t` between −128 and 127.
+Records, optionals, maps, function values and futures cannot cross. The
+wrapper converts them. The narrow integer types arrive in range but are not
+narrowed. For example, an `int8` parameter is an `int64_t` between −128 and
+127.
 
 ## native source
 
-`native source` names a file to compile and link into any program that
-imports the module. The path resolves relative to the file that declares it,
-exactly as an import's does, and must end `.c`, `.m` or `.h`. At build time
-the file is written into a directory of its own module, under its base name,
-so the module's sources sit together and one may `#include` another by name.
-Two sources of the *same* module may not share a base name; two different
-modules may each ship a `util.c`. `.c`/`.m` files are handed to clang; a `.h`
-is written where an `#include` will find it and nothing more.
+`native source` names a file to compile and link into every program that
+imports the module. The path is relative to the file that declares it, as for
+an import. The file name must end with `.c`, `.m` or `.h`. At build time, the
+sources of each module are written into one directory, under their base
+names. As a result, one source can `#include` another source of the same module
+by name. Two sources of the *same* module cannot have the same base name. Two
+different modules can each ship a `util.c`, but two modules cannot define the
+same C symbol. The compiler gives `.c` and `.m` files to clang. It writes a
+`.h` file where an `#include` can find it, and does not compile it.
 
-There is no per-platform form of the statement. A file that differs by
-platform selects with the preprocessor, the way the runtime's own per-OS
-sources do:
+The statement has no per-platform form. Code that is different on each
+platform uses the preprocessor in the source file:
 
 ```c
 #ifdef __APPLE__
@@ -97,11 +97,10 @@ sources do:
 
 ## native flags
 
-`native flags` adds arguments to the link, split on spaces. Name a platform
-(`darwin`, `linux`, `windows`) and the flags apply only when that platform
-is the one compiling — the compiler builds only for its host, so this is
-decided at compile time and costs the build nothing. Omit it and they apply
-everywhere:
+`native flags` adds arguments to the link command, separated by spaces. If the
+statement names a platform (`darwin`, `linux`, `windows`), the flags apply only
+when the compiler runs on that platform. The compiler builds only for its host
+platform. If the statement names no platform, the flags apply on all platforms:
 
 ```nio
 native flags darwin '-framework WebKit -framework Cocoa';
@@ -111,16 +110,17 @@ native flags '-lm';
 
 ## Writing the C side
 
-The native source may `#include "runtime.h"`, which is written beside it,
-and with it the C side sees the same contracts the runtime's own libraries
-are written against:
+The native source can `#include "runtime.h"`. The compiler writes this file
+beside the source. The C code must obey the same rules as the runtime's own
+libraries:
 
-- **Memory for language values comes from the runtime.** A string returned
-  to Nio is built with `rt_str_alloc`, an array with `rt_arr_new` — never
-  `malloc`, whose blocks the collector would sweep past.
-- **Root what you hold across an allocation.** The collector is precise: a
-  `Str *` or `Arr *` held in a C local while anything allocates must sit in
-  a pushed `GCFrame`, or the collector cannot see it.
+- **Memory for language values comes from the runtime.** A string that the C
+  code returns to Nio comes from `rt_str_alloc`, and an array comes from
+  `rt_arr_new`. Language values must not come from `malloc`, because the
+  collector does not manage blocks from `malloc`.
+- **Root every value held across an allocation.** The collector is precise. If a
+  C local holds a `Str *` or `Arr *` while an allocation occurs, the value
+  must be in a pushed `GCFrame`. If it is not, the collector cannot see it.
 
 ```c
 #include <stdint.h>
@@ -145,14 +145,14 @@ Str *greet(Str *name) {
 }
 ```
 
-Run a program using native code under `NIO_GC_STRESS=1` while developing:
-it collects at every allocation, which turns a missing root into an
-immediate failure instead of a rare one.
+During development, a program that uses native code can run with
+`NIO_GC_STRESS=1`. This setting collects at every allocation. As a result, a
+missing root causes an immediate failure instead of a rare one.
 
 ## The wrapping pattern
 
-An extern is a binding, not an API. The library face is ordinary Nio, where
-failure can raise and types can be records:
+The module exports an API written in ordinary Nio, where functions can raise
+errors and types can be records:
 
 ```nio
 native source './scale_native.c';
@@ -170,9 +170,6 @@ export Scale! open(String device) {
 }
 ```
 
-This is also why externs cannot be exported: the seam between C and Nio
-stays inside the module that owns it.
-
 The [webview library](/docs/libraries/webview) is a complete example of this
-pattern: an Objective-C body over Cocoa and WebKit, bound by `extern`, behind
-an API written in ordinary Nio.
+pattern. It has an Objective-C implementation that uses Cocoa and WebKit,
+binds it with `extern`, and exports an API written in ordinary Nio.

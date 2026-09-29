@@ -1,6 +1,6 @@
 ---
 title: "json module"
-description: "The Nio json module turns records and other values into JSON text, and parses JSON into typed values or into a tree you can navigate."
+description: "The Nio json module turns records and other values into JSON text, and parses JSON into typed values or into a tree that a program can navigate."
 ---
 
 # JSON
@@ -11,7 +11,7 @@ description: "The Nio json module turns records and other values into JSON text,
 import 'json';
 ```
 
-Use `json.toText` to turn Nio values into JSON and `json.parse(text) as T` to read JSON into a type.
+`json.toText` turns Nio values into JSON. `json.parse(text) as T` reads JSON into a type.
 
 ```nio
 import 'json';
@@ -43,13 +43,13 @@ JSON values map to Nio values as follows:
 | null | `T?` |
 | any shape | `Json` |
 
-Record fields use their declared names as JSON keys. Add a `'json:key'` annotation to use another name, for example `int horsePower 'json:horse_power';`.
+Record fields use their declared names as JSON keys. A `'json:key'` annotation gives another name, for example `int horsePower 'json:horse_power';`.
 
 <a id="function-typed-fields"></a>
 
 Optional fields that are `null`, function fields, and `RegExp` fields are omitted when a record is serialized.
 
-`Json` values have one of these `json.Type` members: `MISSING`, `NULL`, `BOOL`, `NUMBER`, `STRING`, `ARRAY`, or `OBJECT`. Index objects with a `String` and arrays with an `int`. Missing keys and out-of-range reads return `MISSING`. Indexed assignment inserts or replaces values; writing through a missing value or the wrong shape causes a runtime error.
+`Json` values have one of these `json.Type` members: `MISSING`, `NULL`, `BOOL`, `NUMBER`, `STRING`, `ARRAY`, or `OBJECT`. An object takes a `String` index, and an array takes an `int` index. Missing keys and out-of-range reads return `MISSING`. Indexed assignment inserts or replaces values. A write through a missing value or a value of the wrong shape causes a runtime error.
 
 ```nio
 import 'json';
@@ -104,7 +104,7 @@ Json json.parse(String text)
 
 Parses JSON text. Parsing is fallible for malformed JSON, missing required fields, wrong value types, and out-of-range numbers.
 
-Each form also accepts a `byte[]` in place of the `String`. A document that arrives as bytes — a file from `fs.readFile`, a request body from `http` — is parsed in place, without the copy `string.fromByteArray` would make first:
+Each form also accepts a `byte[]` in place of the `String`. A document that is already bytes, for example a file from `fs.readFile` or a request body from `http`, can go to `json.parse` directly. This prevents the copy that `string.fromByteArray` makes:
 
 ```nio
 import 'fs';
@@ -115,7 +115,7 @@ Json? doc = json.parse(fs.readFile("config.json")) catch e {
 };
 ```
 
-With `as T`, required fields must be present, optional fields may be missing or `null`, and unknown keys are ignored. `strict as T` rejects unknown keys. A `Json` field annotated with `'json*'` preserves them instead; nested records need their own such field, and it cannot be combined with `strict`.
+With `as T`, required fields must be present, optional fields can be missing or `null`, and unknown keys are ignored. `strict as T` rejects unknown keys. A `Json` field annotated with `'json*'` keeps the unknown keys instead. Each nested record needs its own `'json*'` field. A `'json*'` field cannot be used with `strict`.
 
 Without `as T`, the result is a dynamic `Json`. An existing `Json` can also be converted later with `value as T`.
 
@@ -151,14 +151,13 @@ Limits? limits = json.parse(
 };
 ```
 
-### Union fields: one key, several shapes
+### Union fields
 
-Real-world documents often carry a field that is sometimes one kind and
-sometimes another — a price that is usually `"$4.99"` but occasionally the
-bare number `100`. A union models it directly: the JSON kind of the value
-(string, number, `true`/`false`, array, object) picks the member, and
-`json.toText` writes the payload back bare, so the document round-trips
-exactly as it arrived.
+A document can have a field that is sometimes one kind of value and sometimes
+another. For example, a price can be the string `"$4.99"` or the number `100`.
+A union is the type for this kind of field. The JSON kind of the value (string, number,
+`true`/`false`, array, object) selects the member. `json.toText` writes only the
+payload. The output is the same as the original document.
 
 ```nio
 import 'json';
@@ -180,14 +179,17 @@ forEach(items, it) {
 print(json.toText(items) == doc);                     // true
 ```
 
-The choice must be unambiguous, and the compiler checks it where the `as`
-is written: no two members may be read from the same JSON kind. `String`
-and `DateTime` both arrive as strings, every numeric type as a number, and
-every record or `Map<String, V>` as an object, so `union Bad { int I, float F }`
-is refused as a parse target with both tags named. JSON `null` chooses no
-member — a field that may be null is `Price?`, like any other type — and a
-value of a kind no member takes is a catchable failure naming the kinds the
-union does take: `expected a string or a number at [0].price`.
+The member must be unambiguous. The compiler checks this where the `as` is
+written: no two members can be read from the same JSON kind. `String` and
+`DateTime` are both read from JSON strings. Every numeric type is read from a
+JSON number. Every record and every `Map<String, V>` is read from a JSON
+object. For this reason, the compiler refuses `union Bad { int I, float F }` as a parse
+target, and the error names both tags.
+
+JSON `null` selects no member. A field that can be null has the type `Price?`, as
+with any other type. If a value has a kind that no member accepts, the parse
+fails with an error that the caller can catch. The error names the kinds that the
+union accepts: `expected a string or a number at [0].price`.
 
 ## `json.getType()`
 
@@ -214,7 +216,7 @@ print(json.getType(doc["missing"]) == json.Type.MISSING); // true
 int json.asInt(Json value)
 ```
 
-Reads a whole JSON number as an `int`. The call is fallible when the value is missing, has another type, is fractional, or is outside the integer range.
+Reads a JSON number that has no fractional part as an `int`. The call is fallible when the value is missing, has another type, is fractional, or is outside the integer range.
 
 ```nio
 import 'json';

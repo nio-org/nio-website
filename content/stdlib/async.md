@@ -1,6 +1,6 @@
 ---
 title: "async module"
-description: "The Nio async module: handle a future's result with a callback using async.run, and wait for the first of several futures with async.race."
+description: "The Nio async module: async.run handles a future's result with a callback, and async.race waits for the first of several futures."
 ---
 
 # Async
@@ -13,15 +13,15 @@ import 'async';
 
 The `async` module contains two functions. `async.run` handles a future's result with a callback instead of awaiting it, and `async.race` waits for the first of several futures to finish.
 
-Async functions, `Future<T>`, and `await` are language features and do not need an import. See [Async and futures](/docs/async) for an introduction.
+Async functions, `Future<T>`, and `await` are language features and do not need an import. [Async and futures](/docs/async) gives an introduction.
 
 ## Notes
 
 * Calling an async function returns a `Future<T>`.
-* Use `await future` when later code needs the result.
-* Use `async.run(future, callback)` when you want to register a callback and continue immediately.
-* Use `async.race(a, b, ...)` when you want whichever of several futures finishes first.
-* A fallible future (`Future<T!>`) must be awaited so its error can be caught.
+* `await future` waits for the result. It is for code that needs the result later.
+* `async.run(future, callback)` registers a callback. The caller continues immediately.
+* `async.race(a, b, ...)` tells which of several futures finishes first.
+* A fallible future (`Future<T!>`) must be awaited. Its error can be caught only at an `await`.
 
 ## `async.run()`
 
@@ -31,7 +31,7 @@ void async.run(Future<T> future, Function(T)<void> callback)
 
 Registers `callback` to run with the future's result. The call itself returns immediately.
 
-For `Future<void>`, the callback takes no arguments. If the future has already completed, the callback runs during the call to `async.run`. Fallible futures are not accepted; await them so their errors can be caught.
+For `Future<void>`, the callback takes no arguments. If the future has already completed, the callback runs during the call to `async.run`. Fallible futures are not accepted. A fallible future must be awaited, because its error can be caught only at an `await`.
 
 ```nio
 import 'async';
@@ -70,9 +70,9 @@ print(name);                     // unknown
 Future<int> async.race(Future<any> first, ...Future<any> more)
 ```
 
-Returns a future of the **index** of whichever argument completes first.
+Returns a future that holds the **index** of the first argument to complete.
 
-An index rather than a result, because the futures need not have the same type — racing a network read against a timer is what it is for, and those two have no answer type in common. Awaiting the winner afterwards costs nothing: awaiting an already-completed future never suspends.
+The result is an index because the futures can have different types. For example, a program can race a network read against a timer. An `await` on the first future gets its result. An `await` on a completed future does not suspend.
 
 ```nio
 import 'async';
@@ -92,8 +92,8 @@ void async waitForReply(Socket sock) {
 }
 ```
 
-Unlike `async.run`, the arguments may be fallible: a race hands back an index and leaves every future as it was, so the error is still waiting at the `await` that collects it.
+The arguments can be fallible futures, which `async.run` does not accept. `async.race` does not change the futures. An error stays in its future until an `await` on that future catches it.
 
-**The losers keep running.** Nothing is cancelled, so a fallible loser still owes its error to someone — await it, or the program stops when it finishes (see [Errors](/docs/errors)). For a plain timeout on a network operation, the `timeout` option in [`net.Options`](/docs/stdlib/net#netoptions) is simpler and does cancel.
+**The other futures keep running.** `async.race` cancels nothing. Each fallible future must be awaited. If a future fails and no `await` collects its error, the program stops when it has no more work to do (see [Errors](/docs/errors)). The `timeout` option in [`net.Options`](/docs/stdlib/net#netoptions) sets a timeout on a network operation. That option cancels the operation.
 
-If one of the futures has already completed, it wins before the others are consulted; ties go to the earliest argument. Racing zero futures, or anything that is not a future, is a compile error.
+If a future has already completed when `async.race` is called, `async.race` returns its index. When more than one future is complete, the result is the index of the earliest argument. A race with zero futures, or with an argument that is not a future, is a compile error.

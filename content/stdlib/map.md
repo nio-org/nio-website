@@ -13,14 +13,14 @@ import 'map';
 
 The `Map<K, V>` type is built into the language. The `map` module adds functions for copying a map, checking and removing keys, and retrieving its keys or values.
 
-See [Maps](/docs/maps) for map literals, indexing, assignment, and `.length`.
+[Maps](/docs/maps) describes map literals, indexing, assignment, and `.length`.
 
 ## Notes
 
 * Maps keep their entries in insertion order.
 * `keys` and `values` return new arrays. Changing those arrays does not change the map.
 * `copy` creates a new map, but it does not copy records stored inside it.
-* These are module functions: use `map.has(ages, "ada")`, not `ages.has("ada")`.
+* These are module functions. The call is `map.has(ages, "ada")`, not `ages.has("ada")`.
 
 ## `map.copy()`
 
@@ -48,7 +48,7 @@ print(copy.length);      // 3
 bool map.has(Map<K, V> m, K key)
 ```
 
-Reports whether `key` is present in the map.
+Returns `true` when `key` is in the map.
 
 ```nio
 import 'map';
@@ -65,7 +65,7 @@ print(map.has(ages, "grace"));   // false
 K[] map.keys(Map<K, V> m)
 ```
 
-Returns the keys in insertion order as a new growable array. Use it with `forEach` to iterate over a map.
+Returns the keys in insertion order as a new growable array. Together with `forEach`, it iterates over a map.
 
 ```nio
 import 'map';

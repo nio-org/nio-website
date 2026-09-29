@@ -24,12 +24,13 @@ print(regexp.find("order 42", digits));    // 6
 
 ## Notes
 
-* Create a `RegExp` once and reuse it for multiple searches.
-* `regexp.create` is fallible, so a pattern from a user or config file can be handled with `catch`.
+* A `RegExp` can be created once and used for multiple searches.
+* `regexp.create` is fallible. When a pattern comes from a user or a config file, a `catch` handles its errors.
 * Matching works on bytes. Returned positions are byte offsets, `.` matches one byte, and case-insensitive matching covers ASCII letters.
-* Matching time is bounded by the subject length and pattern size; patterns do not cause catastrophic backtracking.
-* A pattern that begins with literal text — or with `\b` or `^` and then literal text — is much faster over a long subject: the search scans for that text and only runs the pattern where it could match. A pattern beginning with `.` or `.*`, or one that can match the empty string, gives the search nothing to scan for: `the .*cat` scans for `the `, where `.*the cat` is tried at every position.
-* `RegExp` values can be stored and passed around, but they cannot be printed, compared, or serialized.
+* Matching time is linear in the length of the subject. It also increases with the size of the pattern.
+* On a long subject, a pattern that starts with literal text is much faster. This is also true when `\b` or `^` comes before the literal text. The search looks for that text and runs the pattern only at the positions where it can match.
+* The search has no text to look for when a pattern starts with `.` or `.*`, or when a pattern can match the empty string. For example, the search for `the .*cat` looks for `the `. The search for `.*the cat` tries the pattern at each position.
+* A program can store `RegExp` values and pass them to functions. It cannot print, compare, or serialize them.
 * A `RegExp` variable must be initialized with `regexp.create` before it is used.
 
 ## `regexp.create()`
@@ -38,17 +39,17 @@ print(regexp.find("order 42", digits));    // 6
 RegExp regexp.create(String pattern, String? flags)
 ```
 
-Compiles a pattern. Leave out `flags`, or pass `""`, for the default behavior.
+Compiles a pattern. Without `flags`, or with `""`, the behavior is the default.
 
 The available flags are:
 
 | Flag | Effect |
 | --- | --- |
 | `i` | Match ASCII letters without regard to case. |
-| `m` | Let `^` and `$` also match line boundaries. |
-| `s` | Let `.` match a newline. |
+| `m` | `^` and `$` also match line boundaries. |
+| `s` | `.` also matches a newline. |
 
-Invalid patterns and unknown flags produce a catchable error.
+An invalid pattern or an unknown flag raises a catchable error.
 
 The supported pattern syntax is:
 
@@ -69,7 +70,7 @@ The supported pattern syntax is:
 | `\s` `\S` | Whitespace, or not whitespace |
 | `\n` `\r` `\t` `\f` `\v` `\0` `\xHH` | Escaped byte |
 
-Backslashes must be escaped in Nio strings. Groups are available for repetition and alternatives, but captures cannot be read. Backreferences, lookahead, lookbehind, inline flags, Unicode classes, and POSIX named classes are not supported.
+Each backslash in a Nio string must be escaped. Groups work with repetition and alternatives. Captures cannot be read. Backreferences, lookahead, lookbehind, inline flags, Unicode classes, and POSIX named classes are not supported.
 
 ```nio
 import 'regexp';
@@ -114,7 +115,7 @@ if (start >= 0) {
 bool regexp.match(String text, RegExp pattern)
 ```
 
-Reports whether the pattern matches anywhere in the string. Use `^` and `$` when the entire string must match.
+Returns `true` when the pattern matches at a position in the string. A pattern that must match all of the string starts with `^` and ends with `$`.
 
 ```nio
 import 'regexp';

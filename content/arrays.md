@@ -7,7 +7,7 @@ description: "Arrays in Nio: declaring them, fixed-size arrays, reading and writ
 
 ## Declaring arrays
 
-An array type is written `T[]`. Arrays are created with a literal, and elements are mutable:
+An array type is written `T[]`. A literal creates an array. The elements of an array can change:
 
 ```nio
 int[] myArray = [2, 5, 4];
@@ -15,13 +15,13 @@ String[] names = ["ada", "grace"];
 int[] empty = [];              // element type comes from the declaration
 ```
 
-An empty literal `[]` is only valid where the element type is known from context.
+An empty literal `[]` is valid only where the context gives the element type.
 
-A `T[]` array is *growable*: the [array library](/docs/stdlib/array) can push and pop elements, changing its length at run time.
+A `T[]` array is *growable*. The [array library](/docs/stdlib/array) can push and pop elements, which changes the length of the array at run time.
 
 ## Fixed-size arrays
 
-Writing a size in the type, `T[N]`, declares a *fixed-size* array. Like an array in C, `N` is the actual length, not a maximum — declared without an initializer, the array holds `N` zero values, and a literal for it must have exactly `N` elements:
+A size in the type, `T[N]`, declares a *fixed-size* array. `N` is the length of the array, not a maximum. An array declared without an initializer holds `N` zero values. A literal for the array must have exactly `N` elements:
 
 ```nio
 int[5] fixed = [1, 2, 3, 4, 5];
@@ -30,9 +30,9 @@ fixed[2] = 33;                 // elements are mutable, the length is not
 String[3] names;               // ["", "", ""]
 ```
 
-The length of a fixed-size array never changes: `array.push` and `array.pop` on it are compile errors, and so is a constant index the compiler can see is out of range (`fixed[7]`).
+The length of a fixed-size array never changes. `array.push` and `array.pop` on a fixed-size array are compile errors. A constant index that is out of range, such as `fixed[7]`, is also a compile error.
 
-`T[N]` and `T[]` are distinct types — neither is assignable to the other, because a growable alias of a fixed-size array could change its length. `array.copy` returns a growable copy of either flavor, which is also how a fixed-size array becomes a growable one:
+`T[N]` and `T[]` are different types. One cannot be assigned to the other, because a growable reference to a fixed-size array could change its length. `array.copy` returns a growable copy of either type of array. It makes a growable array from a fixed-size array:
 
 ```nio
 import 'array';
@@ -42,7 +42,7 @@ int[] loose = array.copy(fixed);
 array.push(loose, 6);          // fine; fixed still has 5 elements
 ```
 
-Record types work as element types too, and the literals inside the array take their type from the declaration:
+Record types can also be element types. The literals inside the array get their type from the declaration:
 
 ```nio
 type Car { String make; int age; }
@@ -55,7 +55,7 @@ Car[] myCars = [
 
 ## Reading and writing elements
 
-Indices are `int`, zero-based, and bounds-checked at runtime — an out-of-range access aborts the program with a runtime error:
+Indices are `int` and start at zero. The program checks each index at run time. An index that is out of range stops the program with a runtime error:
 
 ```nio
 import 'json';
@@ -67,7 +67,7 @@ a[2] = 99;
 print(json.toText(a));    // [10,20,99]  (printing takes scalars; arrays go through json.toText)
 ```
 
-`a.length` is the number of elements, as a read-only `int`:
+`a.length` is the number of elements. It is a read-only `int`:
 
 ```nio
 print(a.length);  // 3
@@ -75,7 +75,7 @@ print(a.length);  // 3
 
 ## Growing, shrinking, sorting, searching
 
-The `array` standard library module holds what an expression cannot say. `push` and `pop` change a growable array's length in place, and `sort` reorders in place — every reference to the array sees all three. `slice`, `copy` and `indexOf` leave it alone. See [the array library](/docs/stdlib/array) for the full reference:
+The `array` standard library module has the functions that change, sort and search arrays. `push` and `pop` change the length of a growable array in place, and `sort` changes the order in place. All references to the array see these changes. `slice`, `copy` and `indexOf` do not change the array. [The array library](/docs/stdlib/array) page has the full reference:
 
 ```nio
 import 'array';
@@ -93,7 +93,7 @@ print(json.toText(array.slice(ns, 1, 3)));  // [3,5] — a new array
 
 ## Looping with `forEach`
 
-The `forEach` statement runs its block once per element, in order. It names the element and, optionally, the index:
+The `forEach` statement runs its block once for each element, in order. It gives a name to the element and, optionally, to the index:
 
 ```nio
 int[] a = [2, 5, 4];
@@ -110,7 +110,7 @@ forEach(a, element, i) {
 }
 ```
 
-The bindings are visible only inside the block. The element binding holds a copy — assigning to it does not change the array; write through the index instead:
+The bindings are visible only inside the block. The element binding holds a copy. An assignment to it does not change the array. A write through the index changes the array:
 
 ```nio
 forEach(a, element, i) {
@@ -120,7 +120,7 @@ forEach(a, element, i) {
 
 ## Looping with `for`
 
-When `forEach` doesn't fit (walking backwards, stepping by two, …), use a `for` loop:
+A `for` loop covers the cases where `forEach` is not suitable, for example to go backwards or to step by two:
 
 ```nio
 int[] a = [2, 5, 4];
@@ -136,7 +136,7 @@ for (int i = a.length - 1; i >= 0; i--) {
 }
 ```
 
-The counter declared in the header is visible only inside the loop. `break` and `continue` work in every loop — `continue` in a `for` loop still runs the post clause, so the counter keeps advancing:
+The counter declared in the header is visible only inside the loop. `break` and `continue` work in all loops. `continue` in a `for` loop runs the post clause. As a result, the counter still moves to its next value:
 
 ```nio
 int firstOver(int[] a, int limit) {
@@ -151,7 +151,7 @@ int firstOver(int[] a, int limit) {
 print(firstOver([2, 5, 4], 3));  // 5
 ```
 
-`while` works too, of course:
+A `while` loop is also available:
 
 ```nio
 int i = 0;
@@ -162,4 +162,4 @@ while (i < a.length) {
 
 > [!NOTE]
 >
-> More array functions (`map`, `filter`, slicing, …) are planned but not in v0.1.
+> The [`array` module](/docs/stdlib/array) has more functions for arrays, for example `map`, `filter`, `slice` and `sort`.

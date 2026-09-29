@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Learn the core of Nio in a few complete programs: variables, records, functions, async code, errors, files and optional values."
+description: "The core of Nio in a few complete programs: variables, records, functions, async code, errors, files and optional values."
 ---
 
 # Quickstart
@@ -52,17 +52,17 @@ print(selectedId);         // null
 print(fetchedName);        // null
 ```
 
-Nio programs run from top to bottom; there is no required `main` function. Save the example as `hello.nio` and run it with:
+Nio programs run from top to bottom. There is no required `main` function. Save the example as `hello.nio` and run it with:
 
 ```sh
 nio run hello.nio
 ```
 
-Functions become fallible automatically when they return an `Error` or call another fallible function. There is no error marker on `fetchName`; the `!` appears only in the `Future<String!>` type used to store the call.
+Functions become fallible automatically when they return an `Error` or call another fallible function. There is no error marker on `fetchName`. The `!` appears only in the `Future<String!>` type used to store the call.
 
 ## Reading and writing a file
 
-File contents are byte arrays. Use the `string` module when the contents are text.
+File contents are byte arrays. The `string` module converts them to text and from text.
 
 ```nio
 import 'fs';
@@ -84,11 +84,11 @@ if (content != null) {
 }
 ```
 
-See the [`fs` reference](/docs/stdlib/fs) for directories, metadata, temporary directories, and deletion.
+The [`fs` reference](/docs/stdlib/fs) describes directories, metadata, temporary directories, and deletion.
 
 ## Extending a record
 
-`extends` copies a record's fields and methods into another type. Use `override` to replace an inherited method.
+`extends` copies a record's fields and methods into another type. `override` replaces an inherited method.
 
 ```nio
 type Vehicle {
@@ -119,7 +119,7 @@ truck.describe();         // volvo has 6 wheels
 print(truck.load);        // 900
 ```
 
-The two declarations still name distinct types: a `Truck` is not automatically assignable to a `Vehicle`. See [Extending a type](/docs/basics#extending-a-type) for the complete rules.
+The two declarations still name distinct types. A `Truck` is not automatically assignable to a `Vehicle`. [Extending a type](/docs/basics#extending-a-type) gives the complete rules.
 
 ## Narrowing an optional
 
@@ -145,4 +145,4 @@ if (nickname != null) {
 }
 ```
 
-See [Optionals](/docs/basics#optionals-t) for optional chaining and other narrowing patterns.
+[Optionals](/docs/basics#optionals-t) describes optional chaining and other narrowing patterns.
